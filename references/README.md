@@ -1,5 +1,4 @@
 # References
-
 Technical documentation for claw-compactor internals.
 
 ## Files

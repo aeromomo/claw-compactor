@@ -65,7 +65,7 @@ class TestObserveCommand:
         import os
         old_expand = os.path.expanduser
         def mock_expand(p):
-            if ".openclaw/sessions" in p:
+            if ".openclaw/agents/main/sessions" in p:
                 return str(tmp_path / "nonexistent")
             return old_expand(p)
         
@@ -86,7 +86,7 @@ class TestObserveCommand:
         import os
         old_expand = os.path.expanduser
         def mock_expand(p):
-            if ".openclaw/sessions" in p:
+            if ".openclaw/agents/main/sessions" in p:
                 return str(tmp_path / "nonexistent")
             return old_expand(p)
         

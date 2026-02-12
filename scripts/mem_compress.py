@@ -171,10 +171,18 @@ def cmd_observe(workspace: Path, args) -> int:
     """Scan session transcripts and generate observations."""
     from observation_compressor import parse_session_jsonl, extract_tool_interactions, rule_extract_observations, format_observations_md
 
-    sessions_dir = os.path.expanduser("~/.openclaw/sessions")
-    if not os.path.isdir(sessions_dir):
-        print(f"Sessions directory not found: {sessions_dir}", file=sys.stderr)
+    # OpenClaw stores transcripts per-agent at ~/.openclaw/agents/<agentId>/sessions/
+    sessions_base = os.path.expanduser("~/.openclaw/agents")
+    sessions_dirs = []
+    if os.path.isdir(sessions_base):
+        for agent_id in os.listdir(sessions_base):
+            agent_sessions = os.path.join(sessions_base, agent_id, "sessions")
+            if os.path.isdir(agent_sessions):
+                sessions_dirs.append(agent_sessions)
+    if not sessions_dirs:
+        print(f"No session directories found under {sessions_base}/*/sessions/", file=sys.stderr)
         return 1
+    sessions_dir = sessions_dirs[0]  # primary agent
 
     # Load tracker
     mem_dir = workspace / "memory"
@@ -429,11 +437,14 @@ def cmd_benchmark(workspace: Path, args) -> int:
     print(f"💰 Total savings: {total_saved:,} tokens ({total_pct:.1f}%)")
     print()
 
-    # Session transcript info
-    sessions_dir = os.path.expanduser("~/.openclaw/sessions")
+    # Session transcript info — scan all agent session dirs
+    sessions_base = os.path.expanduser("~/.openclaw/agents")
     session_count = 0
-    if os.path.isdir(sessions_dir):
-        session_count = len(list(Path(sessions_dir).glob("*.jsonl")))
+    if os.path.isdir(sessions_base):
+        for agent_id in os.listdir(sessions_base):
+            agent_sessions = Path(sessions_base) / agent_id / "sessions"
+            if agent_sessions.is_dir():
+                session_count += len(list(agent_sessions.glob("*.jsonl")))
     print(f"Session Transcripts: {session_count} files found")
     print()
 

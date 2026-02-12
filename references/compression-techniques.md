@@ -27,7 +27,6 @@ Chinese punctuation, Description=Fullwidth `,.!` → halfwidth `,.!` (saves 1 to
 ### Production Server
 - IP: 10.0.2.1, Internal: 10.0.1.2, User: deploy
 
-### Production Server
 - Internal IP: 10.0.2.1, IP: 10.0.1.2, SSH user: deploy
 - SSH: `ssh -i ~/.ssh/server_key.pem deploy@10.0.2.1`
 
@@ -61,15 +60,12 @@ The duplicate "Production Server" section was merged (near-dedup), and the empty
  "$A4": "server_key.pem",
  "$A5": "my-secret-token-2024"
  }
-}
-```
 
 **Before (TOOLS.md excerpt):**
 - user: example_user
 - SSH: ssh -i ~/.ssh/server_key.pem deploy@10.0.1.2
 - IP: 10.0.1.1, Token: my-secret-token-2024, Workspace: /home/user/workspace
 
-**After:**
 - user: $A1
 - SSH: ssh -i ~/.ssh/$A4 deploy@$A2.2
 - IP: $A2.1, Token: $A5, Workspace: /home/$A1/$A3
@@ -109,23 +105,18 @@ This is the single largest source of savings. Raw session transcripts contain ve
  <narrative>Set up mesh network connecting 3 nodes</narrative>
  </observation>
 </observations>
-```
 
 **Before (raw session, 847 lines):**
-```
 {"role":"assistant","content":"Let me check the network..."}
 {"role":"tool","name":"exec","content":"network status\n200 OK...\n"}
 {"role":"assistant","content":"Good, the network is active. Let me check peers..."}
 ... (800+ more lines of tool output)
-```
 
 **After (observation, 12 lines):**
 
 ## 1. [config] Multi-Node Network Setup
 **Facts:**
-- Gateway: 10.0.1.1
-- Remote node: 10.0.1.2
-- All peers connected
+- Gateway: 10.0.1.1, Remote node: 10.0.1.2, All peers connected
 
 **Result:** 3-node mesh network operational
 
@@ -149,14 +140,10 @@ When multiple IPs share a common prefix (≥2 occurrences), the prefix is extrac
 
 Before:
  - 10.0.1.1
- - 10.0.1.2
- - 10.0.1.3
 
 After:
  $IP1=10.0.1.
  - $IP1.1
- - $IP1.2
- - $IP1.3
 
 ### Enumeration Compaction
 Detects comma-separated uppercase lists and compacts them:

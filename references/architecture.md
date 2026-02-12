@@ -28,7 +28,6 @@ claw-compactor is a modular compression pipeline with a single entry point (`mem
  ▼
  ┌─────────────────┐
  │ lib/ │
- │ │
  │ tokens.py 68 │ Token estimation engine
  │ markdown.py 312 │ MD parsing & manipulation
  │ dedup.py 119 │ Shingle-hash dedup
@@ -43,11 +42,10 @@ claw-compactor is a modular compression pipeline with a single entry point (`mem
 
 ## Data Flow: Full Pipeline
 ┌──────────────────────┐ ┌──────────────────────┐
- │ memory/*.md │ │ .openclaw/sessions/ │
+ │ memory/*.md │ │ .openclaw/agents/*/sessions/ │
  │ MEMORY.md │ │ *.jsonl │
  │ TOOLS.md, etc. │ │ (raw transcripts) │
  └──────────┬───────────┘ └──────────┬────────────┘
- │ │
  ▼ ▼
  │ 1. estimate_tokens │ │ 2. observation_ │
  │ Baseline count │ │ compressor │
@@ -134,57 +132,39 @@ Custom exception hierarchy: `MemCompressError` (base), `FileNotFoundError_`, etc
 ## Layer 0: cacheRetention (Before Compression)
 Before any compression runs, **prompt caching** (`cacheRetention: "long"`) provides a 90% discount on cached prompt tokens with a 1-hour TTL. This is orthogonal to compression — it reduces cost on whatever tokens remain.
 
-```
 Cost reduction stack:
-  Layer 0: cacheRetention: "long"  → 90% cost discount on cached tokens
-  Layer 1: observe (transcripts)   → ~97% token reduction
-  Layer 2: compress (rule engine)  → 4-8% token reduction
-  Layer 3: dict (codebook)         → 4-5% token reduction
-  Layer 4: optimize (tokenizer)    → 1-3% token reduction
-```
+ Layer 0: cacheRetention: "long" → 90% cost discount on cached tokens
+ Layer 1: observe (transcripts) → ~97% token reduction
+ Layer 2: compress (rule engine) → 4-8% token reduction
+ Layer 3: dict (codebook) → 4-5% token reduction
+ Layer 4: optimize (tokenizer) → 1-3% token reduction
 
 Layers 1-4 reduce token count. Layer 0 reduces cost-per-token. They multiply.
 
 ## Heartbeat Integration Flow
-```
- ┌─────────────────────────┐
+┌─────────────────────────┐
  │ Heartbeat fires │
  │ (every ~30 min) │
  └────────────┬────────────┘
-              │
-              ▼
- ┌─────────────────────────┐
  │ Read HEARTBEAT.md │
  │ → memory maintenance? │
- └────────────┬────────────┘
-              │ yes
-              ▼
- ┌─────────────────────────┐
+ │ yes
  │ Run: benchmark │
  │ (non-destructive) │
- └────────────┬────────────┘
-              │
-         ┌────┴────┐
-         │ >5% ? │
-         └────┬────┘
-        yes │    │ no
-            ▼    │
+ ┌────┴────┐
+ │ >5% ? │
+ └────┬────┘
+ yes │ │ no
  ┌──────────────┐│
  │ Run: full ││
  │ pipeline ││
  └──────────────┘│
-              │◀──┘
-              ▼
- ┌─────────────────────────┐
+ │◀──┘
  │ New transcripts? │
  │ (unprocessed JSONL) │
- └────────────┬────────────┘
-        yes │    │ no
-            ▼    ▼
  ┌──────────────┐ HEARTBEAT_OK
  │ Run: observe │
  └──────────────┘
-```
 
 **Trigger logic:** The agent checks `HEARTBEAT.md` for a memory maintenance entry. If present, it runs `benchmark` first (cheap read-only). Only if savings exceed 5% does it commit to the full pipeline. New unprocessed transcripts always trigger `observe` regardless of benchmark results.
 
