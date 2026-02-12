@@ -5,13 +5,13 @@
 
 *"Cut your tokens. Keep your facts."*
 
-**Cut your AI agent's workspace token footprint by 50%+.** One command compresses your entire workspace — memory files, workspace configs, sub-agent context — using 5 layered compression techniques. Primary savings come from compressing workspace files (MEMORY.md, SOUL.md, AGENTS.md, tool definitions) that are injected into every API call. Deterministic. Mostly lossless. No LLM required.
+**Cut your AI agent's token spend in half.** One command compresses your entire workspace — memory files, session transcripts, sub-agent context — using 5 layered compression techniques. Deterministic. Mostly lossless. No LLM required.
 
 ## Features
 - **5 compression layers** working in sequence for maximum savings
 - **Zero LLM cost** — all compression is rule-based and deterministic
 - **Lossless roundtrip** for dictionary, RLE, and rule-based compression
-- **~97% disk savings** on session transcripts via observation extraction (note: transcripts are the persistence layer; OpenClaw's built-in compaction already manages the context window)
+- **~97% savings** on session transcripts via observation extraction
 - **Tiered summaries** (L0/L1/L2) for progressive context loading
 - **CJK-aware** — full Chinese/Japanese/Korean support
 - **One command** (`full`) runs everything in optimal order
