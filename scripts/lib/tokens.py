@@ -29,8 +29,18 @@ except (ImportError, Exception):
 CHARS_PER_TOKEN = 4  # fallback for ASCII text
 CJK_CHARS_PER_TOKEN = 1.5  # CJK characters average ~1.5 chars/token
 
-# CJK unified ideographs + common ranges
-_CJK_RE = re.compile(r'[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef]')
+# CJK unified ideographs, Japanese kana, Korean Hangul, and common ranges
+_CJK_RE = re.compile(
+    r'['
+    r'\u3000-\u303f'    # CJK symbols and punctuation
+    r'\u3040-\u309f'    # Hiragana
+    r'\u30a0-\u30ff'    # Katakana
+    r'\u3400-\u4dbf'    # CJK Unified Ideographs Extension A
+    r'\u4e00-\u9fff'    # CJK Unified Ideographs
+    r'\uac00-\ud7af'    # Hangul Syllables
+    r'\uff00-\uffef'    # Fullwidth Forms
+    r']'
+)
 
 
 def _heuristic_tokens(text: str) -> int:
