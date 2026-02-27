@@ -1,6 +1,6 @@
 ---
 name: claw-compactor
-description: "Claw Compactor v6.0 — 50%+ savings through rule-based compression, dictionary encoding, session observation compression, and progressive context loading."
+description: "Claw Compactor v6.02 — 50%+ savings through rule-based compression, dictionary encoding, session observation compression, and progressive context loading. Auto mode: runs every interaction and reports savings."
 
 # Claw Compactor
 ![Claw Compactor Banner](assets/banner.png)
@@ -8,6 +8,19 @@ description: "Claw Compactor v6.0 — 50%+ savings through rule-based compressio
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/aeromomo/claw-compactor) [![Release](https://img.shields.io/github/v/release/aeromomo/claw-compactor?color=blue)](https://github.com/aeromomo/claw-compactor/releases) [![Tests](https://img.shields.io/badge/tests-800%20passed-brightgreen)](https://github.com/aeromomo/claw-compactor) [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://python.org) [![License](https://img.shields.io/badge/license-MIT-purple)](LICENSE) [![OpenClaw](https://img.shields.io/badge/OpenClaw-skill-orange)](https://openclaw.ai)
 
 *"Cut your tokens. Keep your facts."*
+
+## Auto Mode (Every Interaction)
+Run at the start of every session or interaction:
+```bash
+python3 scripts/mem_compress.py <workspace> auto
+```
+This will:
+1. Compress all workspace files automatically
+2. Track token counts between runs
+3. Report exactly how many tokens saved since last run
+4. Show cumulative savings across all runs
+
+The agent should run `auto` at session start and paste the report into chat so the user sees savings every time.
 
 **Cut your AI agent's token spend in half.** One command compresses your entire workspace — memory files, session transcripts, sub-agent context — using 5 layered compression techniques. Deterministic. Mostly lossless. No LLM required.
 
@@ -30,7 +43,6 @@ description: "Claw Compactor v6.0 — 50%+ savings through rule-based compressio
 \*Lossy techniques preserve all facts and decisions; only verbose formatting is removed.
 
 ## Quick Start
-```bash
 git clone https://github.com/aeromomo/claw-compactor.git
 cd claw-compactor
 
@@ -39,7 +51,6 @@ python3 scripts/mem_compress.py /path/to/workspace benchmark
 
 # Compress everything
 python3 scripts/mem_compress.py /path/to/workspace full
-```
 
 **Requirements:** Python 3.9+. Optional: `pip install tiktoken` for exact token counts (falls back to heuristic).
 
@@ -100,13 +111,9 @@ Before compression runs, enable **prompt caching** for a 90% discount on cached 
  "agents": {
  "defaults": {
  "models": {
-  "anthropic/claude-opus-4-6": {
-   "params": {
-    "cacheRetention": "long"
-   }
-  }
- }
- }
+ "anthropic/claude-opus-4-6": {
+ "params": {
+ "cacheRetention": "long"
  }
 
 Compression reduces token count, caching reduces cost-per-token. Together: 50% compression + 90% cache discount = **95% effective cost reduction**.

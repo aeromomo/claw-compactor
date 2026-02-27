@@ -96,13 +96,9 @@ Before compression runs, enable **prompt caching** for a 90% discount on cached 
  "agents": {
  "defaults": {
  "models": {
-  "anthropic/claude-opus-4-6": {
-   "params": {
-    "cacheRetention": "long"
-   }
-  }
- }
- }
+ "anthropic/claude-opus-4-6": {
+ "params": {
+ "cacheRetention": "long"
  }
 
 Compression reduces token count, caching reduces cost-per-token. Together: 50% compression + 90% cache discount = **95% effective cost reduction**.

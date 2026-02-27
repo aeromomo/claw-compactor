@@ -123,8 +123,14 @@ def _collect_files(
             return []
         return [path]
 
-    # Directory: collect all .md files recursively
-    files = sorted(path.rglob("*.md"))
+    # Directory: collect all .md files recursively, excluding junk dirs
+    _EXCLUDE_DIRS = {"node_modules", ".git", "__pycache__", ".venv", "venv",
+                     "target", "dist", "build", ".tox", ".mypy_cache", ".pytest_cache"}
+    files = []
+    for f in sorted(path.rglob("*.md")):
+        if _EXCLUDE_DIRS.intersection(f.relative_to(path).parts):
+            continue
+        files.append(f)
     if older_than is not None:
         files = [f for f in files if _file_age_days(f) >= older_than]
     return files

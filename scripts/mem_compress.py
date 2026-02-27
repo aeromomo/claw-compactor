@@ -352,8 +352,20 @@ def cmd_full(workspace: Path, args) -> int:
     after_tokens = _count_tokens_in_workspace(workspace)
     saved = before_tokens - after_tokens
     pct = (saved / before_tokens * 100) if before_tokens > 0 else 0
-    print(f"After: {after_tokens:,} tokens")
-    print(f"Tokens saved: {saved:,} ({pct:.0f}%)")
+
+    if getattr(args, 'report', False):
+        # Chat-friendly report for pasting into conversation
+        print()
+        print(f"🦞 **Claw Compactor — Compression Report**")
+        print(f"   📁 Files processed: {len(files)}")
+        print(f"   📊 Before: {before_tokens:,} tokens → After: {after_tokens:,} tokens")
+        print(f"   💰 Saved: **{saved:,} tokens ({pct:.1f}%)**")
+        cost = saved * 0.000015
+        if cost > 0.01:
+            print(f"   💵 Est. cost saved per call: ${cost:.4f}")
+    else:
+        print(f"After: {after_tokens:,} tokens")
+        print(f"Tokens saved: {saved:,} ({pct:.0f}%)")
     return 0
 
 
@@ -468,14 +480,13 @@ def cmd_benchmark(workspace: Path, args) -> int:
 # ── Command map & parser ─────────────────────────────────────────
 
 def cmd_install(workspace: Path, args) -> int:
-    """Install heartbeat integration into the workspace HEARTBEAT.md."""
+    """Install auto-compression into HEARTBEAT.md and optionally set up cron."""
     script_path = Path(__file__).resolve()
     heartbeat_path = workspace / "HEARTBEAT.md"
 
-    # Build the heartbeat entry with absolute paths
+    # Build the heartbeat entry — uses 'auto' for every-interaction compression + reporting
     entry = f"""
-## Memory Compression (auto — claw-compactor)
-- Run `python3 {script_path} {workspace} benchmark --json`
+## Memory Compression (auto — openclaw-token-compressor)
 - If savings >5%: auto-run `python3 {script_path} {workspace} full`
 - If unprocessed session transcripts exist: run observe
 - Record results to `memory/heartbeat-state.json`
@@ -484,20 +495,136 @@ def cmd_install(workspace: Path, args) -> int:
     # Check if already installed
     if heartbeat_path.exists():
         existing = heartbeat_path.read_text(encoding="utf-8")
-        if "claw-compactor" in existing:
+        if "claw-compactor" in existing or "openclaw-token-compressor" in existing:
             print("✅ Already installed in HEARTBEAT.md")
-            return 0
-        # Append to existing
-        with open(heartbeat_path, "a", encoding="utf-8") as f:
-            f.write(entry)
+        else:
+            with open(heartbeat_path, "a", encoding="utf-8") as f:
+                f.write(entry)
+            print(f"✅ Installed into HEARTBEAT.md")
     else:
-        # Create new HEARTBEAT.md
         with open(heartbeat_path, "w", encoding="utf-8") as f:
             f.write("# HEARTBEAT.md\n" + entry)
+        print(f"✅ Created HEARTBEAT.md with auto-compression")
 
-    print(f"✅ Installed claw-compactor heartbeat into {heartbeat_path}")
-    print(f"   Script: {script_path}")
+    # Update SKILL.md guidance for the agent
+    skill_path = script_path.parent.parent / "SKILL.md"
+    print(f"\n📋 Agent instructions (in SKILL.md):")
+    print(f"   Every session start: run `python3 {script_path} {workspace} auto`")
+    print(f"   Paste the report into chat so user sees savings each interaction.")
+    print(f"\n⏰ Optional cron (hourly auto-compress):")
+    print(f"   0 * * * * cd {script_path.parent} && python3 {script_path} {workspace} auto --json >> {workspace}/memory/.compactor-log.jsonl 2>&1")
+    print(f"\n   Script: {script_path}")
     print(f"   Workspace: {workspace}")
+    return 0
+
+
+def cmd_auto(workspace: Path, args) -> int:
+    """Auto-compress and report savings since last run. Designed for every-interaction use."""
+    from compress_memory import compress_file, _collect_files
+
+    tracker_path = workspace / "memory" / ".compactor-state.json"
+    tracker_path.parent.mkdir(exist_ok=True)
+
+    # Load previous state
+    prev_state: Dict[str, Any] = {}
+    if tracker_path.exists():
+        try:
+            prev_state = json.loads(tracker_path.read_text(encoding="utf-8"))
+        except Exception:
+            prev_state = {}
+
+    prev_tokens = prev_state.get("file_tokens", {})
+    prev_total = prev_state.get("total_tokens", 0)
+    prev_time = prev_state.get("last_run", "never")
+
+    # Collect current files and token counts BEFORE compression
+    files = _collect_md_files(workspace)
+    before_tokens: Dict[str, int] = {}
+    for f in files:
+        text = f.read_text(encoding="utf-8", errors="replace")
+        before_tokens[str(f.relative_to(workspace))] = estimate_tokens(text)
+    total_before = sum(before_tokens.values())
+
+    # Run compression pipeline (rule engine + dict + rle + optimize)
+    for f in files:
+        try:
+            compress_file(str(f), dry_run=False, no_llm=True)
+        except Exception:
+            pass
+
+    # Re-count after compression
+    after_tokens: Dict[str, int] = {}
+    for f in files:
+        if f.exists():
+            text = f.read_text(encoding="utf-8", errors="replace")
+            after_tokens[str(f.relative_to(workspace))] = estimate_tokens(text)
+    total_after = sum(after_tokens.values())
+
+    # Calculate deltas
+    this_run_saved = total_before - total_after
+    since_last_saved = prev_total - total_after if prev_total > 0 else this_run_saved
+
+    # Build per-file change report (top changers)
+    changes = []
+    for fname, after in after_tokens.items():
+        before = before_tokens.get(fname, after)
+        if before != after:
+            changes.append({
+                "file": fname,
+                "before": before,
+                "after": after,
+                "saved": before - after,
+                "pct": round((before - after) / before * 100, 1) if before > 0 else 0
+            })
+    changes.sort(key=lambda x: x["saved"], reverse=True)
+
+    # Save state
+    new_state = {
+        "total_tokens": total_after,
+        "file_tokens": after_tokens,
+        "last_run": datetime.now().isoformat(),
+        "runs": prev_state.get("runs", 0) + 1,
+        "cumulative_saved": prev_state.get("cumulative_saved", 0) + this_run_saved,
+    }
+    tracker_path.write_text(json.dumps(new_state, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    if args.json:
+        print(json.dumps({
+            "total_before": total_before,
+            "total_after": total_after,
+            "this_run_saved": this_run_saved,
+            "since_last_saved": since_last_saved,
+            "cumulative_saved": new_state["cumulative_saved"],
+            "runs": new_state["runs"],
+            "last_run": prev_time,
+            "changes": changes[:10],
+        }, indent=2))
+        return 0
+
+    # Chat-friendly report
+    print(f"🦞 Claw Compactor — Auto Report")
+    print(f"   Last run: {prev_time}")
+    print(f"   Files scanned: {len(files)}")
+    print()
+    if this_run_saved > 0:
+        pct = round(this_run_saved / total_before * 100, 1) if total_before > 0 else 0
+        print(f"   This run: {total_before:,} → {total_after:,} tokens ({this_run_saved:,} saved, {pct}% ↓)")
+        if changes:
+            print(f"   Top changes:")
+            for c in changes[:5]:
+                print(f"     {c['file']}: {c['before']:,} → {c['after']:,} ({c['saved']:,} saved, {c['pct']}%)")
+    else:
+        print(f"   No new savings this run — workspace already optimized ✅")
+        print(f"   Current total: {total_after:,} tokens")
+
+    if prev_total > 0 and since_last_saved != this_run_saved:
+        print(f"   Since last run: {since_last_saved:+,} tokens")
+
+    print(f"   Cumulative saved (all time): {new_state['cumulative_saved']:,} tokens across {new_state['runs']} runs")
+    cost_saved = new_state['cumulative_saved'] * 0.000015  # ~$15/1M tokens Opus input
+    if cost_saved > 0.01:
+        print(f"   Estimated cost saved: ${cost_saved:.2f}")
+    print()
     return 0
 
 
@@ -513,6 +640,7 @@ COMMAND_MAP = {
     "full": cmd_full,
     "benchmark": cmd_benchmark,
     "install": cmd_install,
+    "auto": cmd_auto,
 }
 
 
@@ -574,6 +702,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("full", help="Run complete pipeline", parents=[_common])
     p.add_argument("--json", action="store_true")
     p.add_argument("--since", type=str, default=None)
+    p.add_argument("--report", action="store_true", help="Output chat-friendly report")
 
     # benchmark
     p = sub.add_parser("benchmark", help="Performance benchmark", parents=[_common])
@@ -581,6 +710,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     # install
     sub.add_parser("install", help="Install heartbeat auto-compression", parents=[_common])
+
+    # auto
+    p = sub.add_parser("auto", help="Auto-compress and report savings (every interaction)", parents=[_common])
+    p.add_argument("--json", action="store_true")
 
     return parser
 
