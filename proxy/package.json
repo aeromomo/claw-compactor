@@ -1,0 +1,15 @@
+{
+  "name": "claude-code-proxy",
+  "version": "0.7.0",
+  "description": "OpenAI-compatible API proxy for Claude Code CLI with monitoring dashboard",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "ioredis": "^5.9.3"
+  }
+}

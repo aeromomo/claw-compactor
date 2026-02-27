@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw Claude CLI Proxy Gateway</title>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: #30363d; --text: #c9d1d9; --text2: #8b949e;
+    --green: #3fb950; --blue: #58a6ff; --purple: #bc8cff;
+    --cyan: #39d2c0; --orange: #d2883e; --red: #f85149;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Mono', 'Menlo', monospace; font-size: 13px; display: flex; flex-direction: column; }
+
+  /* Top nav bar */
+  .nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 16px;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .nav-logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--blue);
+    margin-right: 12px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .nav-logo .logo-icon { font-size: 18px; }
+
+  .nav-tabs {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .nav-tab {
+    background: transparent;
+    border: none;
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s, color 0.15s;
+    position: relative;
+  }
+
+  .nav-tab:hover {
+    background: var(--bg3);
+    color: var(--text);
+  }
+
+  .nav-tab.active {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--bg);
+    margin-bottom: -1px;
+  }
+
+  .nav-tab .tab-icon { font-size: 14px; }
+  .nav-tab .tab-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .nav-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  .nav-status .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* Panel container */
+  .panel-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel {
+    position: absolute;
+    inset: 0;
+    display: none;
+  }
+
+  .panel.active {
+    display: block;
+  }
+
+  .panel iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--bg);
+  }
+
+  /* Offline overlay */
+  .offline-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--bg);
+    color: var(--text2);
+  }
+
+  .offline-overlay.show {
+    display: flex;
+  }
+
+  .offline-overlay .offline-icon {
+    font-size: 36px;
+    opacity: 0.5;
+  }
+
+  .offline-overlay .offline-msg {
+    font-size: 13px;
+  }
+
+  .offline-overlay .offline-url {
+    font-size: 11px;
+    color: var(--text2);
+    opacity: 0.6;
+  }
+
+  .offline-overlay .retry-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  .retry-btn:hover { background: var(--border); }
+
+  .version-tag {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-size: 11px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-logo">
+    <span class="logo-icon">🦞</span>
+    <span>OpenClaw Claude CLI Proxy Gateway</span>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-panel="proxy" id="tab-proxy">
+      <span class="tab-dot" style="background:var(--blue)"></span>
+      <span>Proxy</span>
+    </button>
+    <button class="nav-tab" data-panel="openclaw" id="tab-openclaw">
+      <span class="tab-dot" style="background:var(--purple)"></span>
+      <span>Sessions</span>
+    </button>
+    <button class="nav-tab" data-panel="aimm" id="tab-aimm">
+      <span class="tab-dot" style="background:var(--cyan)"></span>
+      <span>AIMM</span>
+    </button>
+  </div>
+
+  <div class="nav-status">
+    <span class="version-tag" id="version-tag">-</span>
+    <span id="status-text">loading...</span>
+    <span class="status-dot" id="nav-dot"></span>
+  </div>
+</div>
+
+<div class="panel-container">
+  <!-- Proxy Dashboard -->
+  <div class="panel active" id="panel-proxy">
+    <iframe src="/dashboard/proxy" id="iframe-proxy"></iframe>
+  </div>
+
+  <!-- OpenClaw Sessions -->
+  <div class="panel" id="panel-openclaw">
+    <iframe data-src="" id="iframe-openclaw"></iframe>
+    <div class="offline-overlay" id="offline-openclaw">
+      <span class="offline-icon">🔌</span>
+      <span class="offline-msg">OpenClaw Dashboard not reachable</span>
+      <span class="offline-url" id="url-openclaw"></span>
+      <button class="retry-btn" onclick="loadPanel('openclaw')">Retry</button>
+    </div>
+  </div>
+
+  <!-- AIMM Dashboard -->
+  <div class="panel" id="panel-aimm">
+    <iframe data-src="" id="iframe-aimm"></iframe>
+    <div class="offline-overlay" id="offline-aimm">
+      <span class="offline-icon">🔌</span>
+      <span class="offline-msg">AIMM Dashboard not reachable</span>
+      <span class="offline-url" id="url-aimm"></span>
+      <button class="retry-btn" onclick="loadPanel('aimm')">Retry</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ──
+// Detect the host we're loaded from to build URLs for other dashboards
+const thisHost = window.location.hostname;
+const PANELS = {
+  proxy:    { url: '/dashboard/proxy', loaded: true },
+  openclaw: { url: `http://${thisHost}:8877/`, loaded: false },
+  aimm:     { url: `http://${thisHost}:3000/dashboard`, loaded: false },
+};
+
+// ── Tab switching ──
+let activePanel = 'proxy';
+
+document.querySelector('.nav-tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.nav-tab');
+  if (!tab) return;
+  const panel = tab.dataset.panel;
+  if (panel === activePanel) return;
+  switchPanel(panel);
+});
+
+function switchPanel(panel) {
+  // Deactivate current
+  document.getElementById('tab-' + activePanel).classList.remove('active');
+  document.getElementById('panel-' + activePanel).classList.remove('active');
+
+  // Activate new
+  activePanel = panel;
+  document.getElementById('tab-' + panel).classList.add('active');
+  document.getElementById('panel-' + panel).classList.add('active');
+
+  // Lazy-load iframe if not yet loaded
+  if (!PANELS[panel].loaded) {
+    loadPanel(panel);
+  }
+}
+
+function loadPanel(panel) {
+  const cfg = PANELS[panel];
+  const iframe = document.getElementById('iframe-' + panel);
+  const overlay = document.getElementById('offline-' + panel);
+  const urlEl = document.getElementById('url-' + panel);
+
+  if (urlEl) urlEl.textContent = cfg.url;
+
+  // Try to load iframe
+  iframe.onerror = () => {
+    overlay.classList.add('show');
+  };
+
+  iframe.onload = () => {
+    // Check if it actually loaded (cross-origin will succeed but we can't check content)
+    cfg.loaded = true;
+    overlay.classList.remove('show');
+  };
+
+  iframe.src = cfg.url;
+
+  // Timeout: if iframe doesn't trigger onload within 8s, show offline overlay
+  setTimeout(() => {
+    if (!cfg.loaded) {
+      overlay.classList.add('show');
+    }
+  }, 8000);
+}
+
+// ── Health polling for nav status ──
+let startTime = Date.now();
+
+async function checkHealth() {
+  try {
+    const r = await fetch('/health');
+    const d = await r.json();
+    const uptime = formatDuration(Date.now() - startTime);
+    const active = d.queue?.active || 0;
+    const tok = d.tokens?.total || 0;
+    if (d.version) {
+      document.getElementById('version-tag').textContent = 'v' + d.version;
+    }
+    document.getElementById('status-text').textContent =
+      `${tok > 0 ? fmtTok(tok) + ' tok · ' : ''}${active > 0 ? active + ' active · ' : ''}${uptime}`;
+    document.getElementById('nav-dot').style.background = 'var(--green)';
+  } catch {
+    document.getElementById('status-text').textContent = 'offline';
+    document.getElementById('nav-dot').style.background = 'var(--red)';
+  }
+}
+
+function formatDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60);
+  return h + 'h ' + (m % 60) + 'm';
+}
+
+function fmtTok(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return String(n);
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', (e) => {
+  if (e.altKey || e.metaKey || e.ctrlKey) return;
+  if (e.key === '1') switchPanel('proxy');
+  if (e.key === '2') switchPanel('openclaw');
+  if (e.key === '3') switchPanel('aimm');
+});
+
+// ── Init ──
+checkHealth();
+setInterval(checkHealth, 5000);
+</script>
+</body>
+</html>

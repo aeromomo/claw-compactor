@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Proxy — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: #30363d; --text: #c9d1d9; --text2: #8b949e;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149;
+    --blue: #58a6ff; --purple: #bc8cff; --cyan: #39d2c0;
+    --orange: #d2883e; --opus: #ff7b72; --sonnet: #3fb950; --haiku: #39d2c0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Mono', 'Menlo', monospace; font-size: 13px; }
+
+  /* Header */
+  .header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10; }
+  .header h1 { font-size: 15px; font-weight: 600; color: var(--blue); white-space: nowrap; }
+  .header .version { color: var(--text2); font-size: 12px; }
+  .header .status { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .refresh-note { color: var(--text2); font-size: 11px; }
+
+  /* Hide header when embedded in portal iframe */
+  .in-iframe .header { display: none; }
+
+  /* Token Overview Strip */
+  .tok-strip { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .tok-cell { padding: 12px 16px; border-right: 1px solid var(--border); }
+  .tok-cell:last-child { border-right: none; }
+  .tok-cell .tok-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text2); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .tok-cell .tok-label .model-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .tok-cell .tok-big { font-size: 22px; font-weight: 700; line-height: 1.2; }
+  .tok-cell .tok-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .tok-cell.total .tok-big { color: var(--blue); }
+  .tok-cell.opus .tok-big { color: var(--opus); }
+  .tok-cell.sonnet .tok-big { color: var(--sonnet); }
+  .tok-cell.haiku .tok-big { color: var(--haiku); }
+
+  /* Live bar */
+  .live-bar { background: linear-gradient(90deg, rgba(210,136,62,0.15) 0%, transparent 100%); border-bottom: 1px solid var(--border); padding: 6px 20px; display: flex; align-items: center; gap: 12px; font-size: 12px; }
+  .live-bar .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .live-bar .live-label { color: var(--orange); font-weight: 600; }
+  .live-bar .live-detail { color: var(--text2); }
+
+  /* Main content */
+  .main { padding: 12px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* Chart section */
+  .chart-section { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .chart-header h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
+  .tab-group { display: flex; gap: 2px; }
+  .tab-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; color: var(--text2); font-size: 10px; padding: 2px 8px; cursor: pointer; font-family: inherit; }
+  .tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .chart-wrap { height: 220px; position: relative; }
+
+  /* System panels */
+  .sys-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 8px; }
+  .metric { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; }
+  .metric .label { color: var(--text2); font-size: 12px; }
+  .metric .value { font-weight: 600; font-size: 13px; }
+  .metric .value.green { color: var(--green); }
+  .metric .value.yellow { color: var(--yellow); }
+  .metric .value.red { color: var(--red); }
+  .metric .value.blue { color: var(--blue); }
+  .bar-wrap { margin: 4px 0; }
+  .bar-bg { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--text2); margin-top: 1px; }
+
+  /* Tags */
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 500; }
+  .tag.stream { background: #1f3a5f; color: var(--blue); }
+  .tag.sync { background: #2a1f3f; color: var(--purple); }
+  .tag.opus { background: #3b1f1f; color: var(--opus); }
+  .tag.sonnet { background: #1f3b2f; color: var(--sonnet); }
+  .tag.haiku { background: #1f2f3b; color: var(--haiku); }
+
+  /* Worker traffic bars */
+  .worker-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .worker-row .wname { width: 40px; font-weight: 600; color: var(--blue); font-size: 12px; }
+  .worker-row .wbar { flex: 1; height: 18px; background: var(--bg3); border-radius: 4px; overflow: hidden; position: relative; }
+  .worker-row .wbar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .worker-row .wbar-label { position: absolute; right: 6px; top: 1px; font-size: 10px; color: var(--text); font-weight: 500; line-height: 18px; }
+  .worker-row .wbar-err { position: absolute; left: 6px; top: 1px; font-size: 10px; color: var(--red); font-weight: 500; line-height: 18px; }
+  .worker-row .wlast { width: 60px; font-size: 10px; color: var(--text2); text-align: right; }
+
+  /* Error category list */
+  .err-cat { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--bg3); }
+  .err-cat .cat-name { font-size: 12px; color: var(--text2); }
+  .err-cat .cat-cnt { font-weight: 600; font-size: 13px; min-width: 30px; text-align: right; }
+  .err-cat .cat-cnt.zero { color: var(--text2); }
+  .err-cat .cat-cnt.nonzero { color: var(--red); }
+
+  /* Recent errors */
+  .recent-err { display: flex; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--bg3); font-size: 11px; align-items: baseline; }
+  .recent-err .re-time { color: var(--text2); flex-shrink: 0; width: 60px; }
+  .recent-err .re-worker { color: var(--blue); flex-shrink: 0; width: 24px; font-weight: 600; }
+  .recent-err .re-cat { color: var(--red); flex-shrink: 0; width: 90px; font-weight: 500; }
+  .recent-err .re-detail { color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Tables & Events */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); padding: 5px 6px; border-bottom: 1px solid var(--border); }
+  td { padding: 4px 6px; border-bottom: 1px solid var(--bg3); font-size: 12px; }
+  .bottom-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .scroll-card { max-height: 340px; overflow-y: auto; }
+  .event-row { display: flex; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--bg3); font-size: 11px; align-items: baseline; }
+  .event-row .time { color: var(--text2); flex-shrink: 0; width: 60px; }
+  .event-row .etype { flex-shrink: 0; width: 62px; font-weight: 500; }
+  .event-row .etype.request { color: var(--blue); }
+  .event-row .etype.retry { color: var(--yellow); }
+  .event-row .etype.reap,.event-row .etype.timeout { color: var(--red); }
+  .event-row .etype.kill { color: var(--opus); }
+  .event-row .etype.startup,.event-row .etype.complete { color: var(--green); }
+  .event-row .etype.error { color: var(--red); }
+  .event-row .etype.shutdown,.event-row .etype.slot_leak { color: var(--yellow); }
+  .event-row .tokens { flex-shrink: 0; width: 90px; text-align: right; color: var(--orange); font-size: 10px; }
+  .event-row .detail { color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .empty { color: var(--text2); text-align: center; padding: 16px; font-style: italic; font-size: 12px; }
+
+  /* Live Stream Panel */
+  .stream-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; }
+  .stream-panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); padding: 10px 14px 6px; display: flex; align-items: center; gap: 6px; }
+  .stream-panel h2 .sse-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text2); }
+  .stream-panel h2 .sse-dot.connected { background: var(--green); animation: pulse 2s infinite; }
+  .stream-feeds { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; }
+  .stream-item { padding: 6px 14px; border-top: 1px solid var(--bg3); }
+  .stream-item-header { display: flex; gap: 8px; align-items: center; font-size: 11px; margin-bottom: 3px; }
+  .stream-item-header .sid { color: var(--text2); font-size: 10px; }
+  .stream-item-header .stok { color: var(--orange); font-size: 10px; margin-left: auto; }
+  .stream-item-body { font-size: 12px; color: var(--text); line-height: 1.5; max-height: 80px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; background: var(--bg); border-radius: 4px; padding: 6px 8px; }
+  .stream-item-body .cursor { display: inline-block; width: 2px; height: 12px; background: var(--blue); animation: blink 1s steps(1) infinite; vertical-align: text-bottom; margin-left: 1px; }
+  @keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<script>if (window.self !== window.top) document.body.classList.add('in-iframe');</script>
+
+<!-- Header -->
+<div class="header">
+  <h1>&#9889; Claude Code Proxy</h1>
+  <span class="version" id="version">-</span>
+  <div class="status">
+    <span class="refresh-note" id="refresh-note">loading...</span>
+    <span class="dot" id="status-dot"></span>
+  </div>
+</div>
+
+<!-- Token Overview Strip -->
+<div class="tok-strip" id="tok-strip"></div>
+
+<!-- Live Activity Bar -->
+<div class="live-bar" id="live-bar" style="display:none">
+  <span class="live-dot"></span>
+  <span class="live-label" id="live-label"></span>
+  <span class="live-detail" id="live-detail"></span>
+</div>
+
+<div class="main">
+  <!-- Charts -->
+  <div class="chart-section">
+    <div class="chart-card">
+      <div class="chart-header">
+        <h2>Token Usage / Interval</h2>
+        <div class="tab-group" id="chart-tabs">
+          <button class="tab-btn active" data-w="1h">1H</button>
+          <button class="tab-btn" data-w="6h">6H</button>
+          <button class="tab-btn" data-w="1d">1D</button>
+          <button class="tab-btn" data-w="7d">7D</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="tok-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <h2>Requests / Interval</h2>
+        <div class="tab-group" id="chart-tabs-2">
+          <button class="tab-btn active" data-w="1h">1H</button>
+          <button class="tab-btn" data-w="6h">6H</button>
+          <button class="tab-btn" data-w="1d">1D</button>
+          <button class="tab-btn" data-w="7d">7D</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="req-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Live Stream Feed -->
+  <div class="stream-panel">
+    <h2><span class="sse-dot" id="sse-dot"></span> Live Stream</h2>
+    <div class="stream-feeds" id="stream-feeds"><div class="empty">waiting for streams...</div></div>
+  </div>
+
+  <!-- System Status Row -->
+  <div class="sys-grid">
+    <div class="card">
+      <h2>Queue &amp; Health</h2>
+      <div id="queue-body"><div class="empty">loading...</div></div>
+    </div>
+    <div class="card">
+      <h2>Rate Limits</h2>
+      <div id="rates-body"><div class="empty">loading...</div></div>
+    </div>
+    <div class="card">
+      <h2>Processes</h2>
+      <div id="proc-body"><div class="empty">loading...</div></div>
+    </div>
+  </div>
+
+  <!-- Worker Traffic + Error Stats -->
+  <div class="bottom-panels">
+    <div class="card">
+      <h2>Worker Traffic</h2>
+      <div id="worker-traffic"><div class="empty">loading...</div></div>
+    </div>
+    <div class="card">
+      <h2>Error Categories</h2>
+      <div id="error-cats"><div class="empty">loading...</div></div>
+    </div>
+  </div>
+
+  <!-- Recent Errors -->
+  <div class="card scroll-card" style="margin-bottom: 12px">
+    <h2>Recent Errors</h2>
+    <div id="recent-errors"><div class="empty">no errors yet</div></div>
+  </div>
+
+  <!-- Active Processes + Event Log -->
+  <div class="bottom-panels">
+    <div class="card scroll-card">
+      <h2>Active Processes</h2>
+      <div id="procs-table"><div class="empty">no active processes</div></div>
+    </div>
+    <div class="card scroll-card">
+      <h2>Event Log</h2>
+      <div id="events-body"><div class="empty">waiting for events...</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let lastEventId = 0;
+let startTime = Date.now();
+let currentWindow = '1h';
+let tokChart = null;
+let reqChart = null;
+let historyData = null;
+
+// ── Helpers ──
+function fmt(ms) {
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  if (ms < 3600000) return (ms / 60000).toFixed(1) + 'm';
+  return (ms / 3600000).toFixed(1) + 'h';
+}
+function fmtTok(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return String(n);
+}
+function pct(n, d) { return d > 0 ? Math.round((n / d) * 100) : 0; }
+function barColor(p) { return p < 60 ? 'var(--green)' : p < 85 ? 'var(--yellow)' : 'var(--red)'; }
+function rateBar(label, used, max) {
+  const p = pct(used, max);
+  return `<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${p}%;background:${barColor(p)}"></div></div><div class="bar-label"><span>${label}</span><span>${used}/${max}</span></div></div>`;
+}
+function modelTag(m) { return `<span class="tag ${m}">${m}</span>`; }
+function modeTag(m) { return `<span class="tag ${m}">${m}</span>`; }
+function shortTime(isoTs) {
+  return new Date(isoTs).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+function chartTime(ts) {
+  const d = new Date(ts * 1000);
+  if (currentWindow === '7d') return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (currentWindow === '1d') return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+async function fetchJson(path) { return (await fetch(BASE + path)).json(); }
+
+// ── Chart Setup ──
+const chartDefaults = {
+  responsive: true, maintainAspectRatio: false,
+  animation: { duration: 300 },
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: true, position: 'top', labels: { boxWidth: 10, padding: 8, color: '#8b949e', font: { size: 10, family: 'SF Mono, Menlo, monospace' } } },
+    tooltip: { backgroundColor: '#161b22', borderColor: '#30363d', borderWidth: 1, titleColor: '#c9d1d9', bodyColor: '#c9d1d9', bodyFont: { family: 'SF Mono, Menlo, monospace', size: 11 } },
+  },
+  scales: {
+    x: { ticks: { color: '#8b949e', font: { size: 9 }, maxTicksLimit: 8 }, grid: { color: '#21262d' } },
+    y: { ticks: { color: '#8b949e', font: { size: 9 }, callback: v => fmtTok(v) }, grid: { color: '#21262d' }, beginAtZero: true },
+  },
+};
+
+function initCharts() {
+  const tokCtx = document.getElementById('tok-chart').getContext('2d');
+  tokChart = new Chart(tokCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Total', data: [], borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0 },
+        { label: 'Input', data: [], borderColor: '#3fb950', borderDash: [4,2], tension: 0.3, borderWidth: 1.5, pointRadius: 0 },
+        { label: 'Output', data: [], borderColor: '#d2883e', borderDash: [4,2], tension: 0.3, borderWidth: 1.5, pointRadius: 0 },
+      ],
+    },
+    options: { ...chartDefaults },
+  });
+
+  const reqCtx = document.getElementById('req-chart').getContext('2d');
+  reqChart = new Chart(reqCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Completed', data: [], borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.1)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 0 },
+        { label: 'Active', data: [], borderColor: '#58a6ff', tension: 0.3, borderWidth: 1.5, pointRadius: 0 },
+        { label: 'Errors', data: [], borderColor: '#f85149', tension: 0.3, borderWidth: 1.5, pointRadius: 0 },
+      ],
+    },
+    options: { ...chartDefaults },
+  });
+}
+
+function updateCharts(points) {
+  if (!tokChart || !reqChart || !points || points.length === 0) return;
+
+  const labels = points.map(p => chartTime(p.ts));
+
+  // Per-interval delta: show real-time usage per period, not cumulative
+  // Handles counter resets (server restarts) by clamping negatives to 0
+  function deltas(arr) {
+    return arr.map((v, i) => {
+      if (i === 0) return 0;
+      const d = v - arr[i - 1];
+      return d >= 0 ? d : 0; // clamp negative (counter reset) to 0
+    });
+  }
+
+  const tokTotals = points.map(p => p.tokT);
+  const tokInputs = points.map(p => p.tokI);
+  const tokOutputs = points.map(p => p.tokO);
+
+  tokChart.data.labels = labels;
+  tokChart.data.datasets[0].data = deltas(tokTotals);
+  tokChart.data.datasets[1].data = deltas(tokInputs);
+  tokChart.data.datasets[2].data = deltas(tokOutputs);
+  tokChart.update('none');
+
+  const reqComp = points.map(p => p.reqCompleted);
+
+  reqChart.data.labels = labels;
+  reqChart.data.datasets[0].data = deltas(reqComp);
+  reqChart.data.datasets[1].data = points.map(p => p.reqActive);   // active is point-in-time, not cumulative
+  reqChart.data.datasets[2].data = points.map(p => p.reqErrors);   // errors is point-in-time
+  reqChart.update('none');
+}
+
+// ── Tab click handlers ──
+function setupTabs() {
+  for (const group of ['chart-tabs', 'chart-tabs-2']) {
+    document.getElementById(group).addEventListener('click', (e) => {
+      const btn = e.target.closest('.tab-btn');
+      if (!btn) return;
+      currentWindow = btn.dataset.w;
+      // Sync both tab groups
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.w === currentWindow));
+      fetchHistory();
+    });
+  }
+}
+
+async function fetchHistory() {
+  try {
+    const data = await fetchJson('/metrics/history?window=' + currentWindow);
+    historyData = data.points || [];
+    updateCharts(historyData);
+  } catch { /* ignore */ }
+}
+
+// ── Main refresh ──
+async function refresh() {
+  try {
+    const [metrics, zombies, eventsData] = await Promise.all([
+      fetchJson('/metrics'),
+      fetchJson('/zombies'),
+      fetchJson('/events?since_id=' + lastEventId + '&limit=100'),
+    ]);
+
+    // Header status
+    document.getElementById('version').textContent = 'v0.4.0';
+    document.getElementById('status-dot').className = 'dot ok';
+    document.getElementById('refresh-note').textContent = 'live \u00b7 ' + fmt(Date.now() - startTime);
+
+    // Token Overview Strip — total = completed (historical + session) + live active
+    const tok = metrics.tokens || { totals: { input: 0, output: 0, total: 0, requests: 0 }, byModel: {} };
+    const live = metrics.processes?.liveTokens || { input: 0, output: 0, total: 0 };
+
+    // Compute live tokens per-model from active process list
+    const liveByModel = {};
+    const allProcsForLive = zombies.processes || [];
+    for (const p of allProcsForLive) {
+      const li = p.liveInputTokens || 0;
+      const lo = p.liveOutputTokens || 0;
+      if (li + lo > 0) {
+        const prev = liveByModel[p.model] || { input: 0, output: 0, total: 0 };
+        liveByModel[p.model] = { input: prev.input + li, output: prev.output + lo, total: prev.total + li + lo };
+      }
+    }
+
+    // Grand total = completed + live
+    const grandInput = tok.totals.input + live.input;
+    const grandOutput = tok.totals.output + live.output;
+    const grandTotal = grandInput + grandOutput;
+    const grandReqs = tok.totals.requests;
+
+    let stripHtml = `
+      <div class="tok-cell total">
+        <div class="tok-label"><span class="model-dot" style="background:var(--blue)"></span>Total</div>
+        <div class="tok-big">${fmtTok(grandTotal)}</div>
+        <div class="tok-sub">${fmtTok(grandInput)} in \u2192 ${fmtTok(grandOutput)} out \u00b7 ${grandReqs} req</div>
+      </div>`;
+    for (const model of ['opus', 'sonnet', 'haiku']) {
+      const completed = tok.byModel[model];
+      const lm = liveByModel[model];
+      const mInput = (completed?.input || 0) + (lm?.input || 0);
+      const mOutput = (completed?.output || 0) + (lm?.output || 0);
+      const mTotal = mInput + mOutput;
+      const mReqs = completed?.requests || 0;
+      if (mTotal === 0 && !completed) {
+        stripHtml += `<div class="tok-cell ${model}"><div class="tok-label"><span class="model-dot" style="background:var(--${model})"></span>${model}</div><div class="tok-big" style="color:var(--text2)">-</div><div class="tok-sub">no requests yet</div></div>`;
+      } else {
+        const liveTag = lm && lm.total > 0 ? ` <span style="color:var(--orange)">(+${fmtTok(lm.total)} live)</span>` : '';
+        stripHtml += `
+          <div class="tok-cell ${model}">
+            <div class="tok-label"><span class="model-dot" style="background:var(--${model})"></span>${model}</div>
+            <div class="tok-big">${fmtTok(mTotal)}</div>
+            <div class="tok-sub">${fmtTok(mInput)} in \u2192 ${fmtTok(mOutput)} out \u00b7 ${mReqs} req${liveTag}</div>
+          </div>`;
+      }
+    }
+    document.getElementById('tok-strip').innerHTML = stripHtml;
+
+    // Live bar
+    const liveBar = document.getElementById('live-bar');
+    const procCount = metrics.processes?.total || 0;
+    if (live.total > 0 || procCount > 0) {
+      liveBar.style.display = 'flex';
+      document.getElementById('live-label').textContent = live.total > 0 ? `${fmtTok(live.total)} tokens` : 'active';
+      document.getElementById('live-detail').textContent = live.total > 0
+        ? `${fmtTok(live.input)} in \u2192 ${fmtTok(live.output)} out \u00b7 ${procCount} process${procCount !== 1 ? 'es' : ''}`
+        : `${procCount} process${procCount !== 1 ? 'es' : ''} running`;
+    } else {
+      liveBar.style.display = 'none';
+    }
+
+    // Queue & Health
+    const q = metrics.queue;
+    const qm = q.metrics;
+    document.getElementById('queue-body').innerHTML = `
+      <div class="metric"><span class="label">active / max</span><span class="value ${q.active > 0 ? 'blue' : 'green'}">${q.active} / ${q.maxConcurrent}</span></div>
+      <div class="metric"><span class="label">queued</span><span class="value ${q.totalQueued > 0 ? 'yellow' : ''}">${q.totalQueued}</span></div>
+      <div class="metric"><span class="label">processed</span><span class="value">${qm.totalProcessed}</span></div>
+      <div class="metric"><span class="label">timed out</span><span class="value ${qm.totalTimedOut > 0 ? 'yellow' : ''}">${qm.totalTimedOut}</span></div>
+      <div class="metric"><span class="label">rejected</span><span class="value ${qm.totalRejected > 0 ? 'red' : ''}">${qm.totalRejected}</span></div>
+      <div class="metric"><span class="label">leaked</span><span class="value ${qm.totalLeaked > 0 ? 'yellow' : ''}">${qm.totalLeaked}</span></div>
+    `;
+
+    // Rate Limits
+    const ru = metrics.rateUsage;
+    const rl = metrics.rateLimits;
+    let ratesHtml = '';
+    for (const model of ['opus', 'sonnet', 'haiku']) {
+      const usage = ru[model];
+      if (!usage) continue;
+      const reqUsed = parseInt(usage.requests) || 0;
+      const reqMax = rl[model].requestsPerMin;
+      const tokUsed = parseInt(usage.tokens.replace('~', '')) || 0;
+      const tokMax = rl[model].tokensPerMin;
+      ratesHtml += `<div style="margin-bottom:6px">${modelTag(model)} ${rateBar('req/min', reqUsed, reqMax)} ${rateBar('tok/min', tokUsed, tokMax)}</div>`;
+    }
+    document.getElementById('rates-body').innerHTML = ratesHtml || '<div class="empty">idle</div>';
+
+    // Processes
+    const p = metrics.processes;
+    const pm = p.metrics;
+    document.getElementById('proc-body').innerHTML = `
+      <div class="metric"><span class="label">tracked</span><span class="value blue">${p.total}</span></div>
+      <div class="metric"><span class="label">sync / stream</span><span class="value">${p.byMode.sync} / ${p.byMode.stream}</span></div>
+      ${Object.entries(p.byModel || {}).map(([m, c]) => `<div class="metric"><span class="label">${modelTag(m)}</span><span class="value">${c}</span></div>`).join('')}
+      <div class="metric"><span class="label">zombies</span><span class="value ${zombies.zombies.length > 0 ? 'red' : 'green'}">${zombies.zombies.length}</span></div>
+      <div class="metric"><span class="label">registered</span><span class="value">${p.session?.registered || 0} <span style="color:var(--text2);font-size:10px">/ ${pm.totalRegistered} total</span></span></div>
+      <div class="metric"><span class="label">reaped / killed</span><span class="value">${p.session?.reaped || 0}<span style="color:var(--text2);font-size:10px;margin:0 2px">/</span>${p.session?.killed || 0} <span style="color:var(--text2);font-size:10px">/ ${pm.totalReaped}·${pm.totalKilled} total</span></span></div>
+    `;
+
+    // Worker Traffic
+    const ws = metrics.workerStats;
+    if (ws && ws.traffic) {
+      const entries = Object.entries(ws.traffic);
+      const totalReqs = entries.reduce((s, [, v]) => s + v.requests, 0) || 1;
+      let wtHtml = '';
+      for (const [name, data] of entries) {
+        const pctReq = Math.round((data.requests / totalReqs) * 100);
+        const lastAgo = data.lastReqAt ? fmt(Date.now() - data.lastReqAt) : '-';
+        wtHtml += `<div class="worker-row">
+          <span class="wname">W${name}</span>
+          <div class="wbar">
+            <div class="wbar-fill" style="width:${pctReq}%;background:var(--blue)"></div>
+            ${data.errors > 0 ? `<span class="wbar-err">${data.errors} err</span>` : ''}
+            <span class="wbar-label">${data.requests} req (${pctReq}%)</span>
+          </div>
+          <span class="wlast">${lastAgo}</span>
+        </div>`;
+      }
+      wtHtml += `<div class="metric" style="margin-top:6px"><span class="label">total requests</span><span class="value blue">${totalReqs === 1 && entries.every(([,v]) => v.requests === 0) ? 0 : entries.reduce((s, [,v]) => s + v.requests, 0)}</span></div>`;
+      document.getElementById('worker-traffic').innerHTML = wtHtml;
+    }
+
+    // Error Categories
+    if (ws && ws.errors) {
+      const catLabels = {
+        cli_crash: 'CLI Crash (code=1)',
+        cli_killed: 'CLI Killed (SIGTERM)',
+        context_overflow: 'Context Overflow',
+        api_error: 'API Error',
+        stream_retry: 'Stream Retry',
+        timeout: 'Timeout',
+        queue_timeout: 'Queue Timeout',
+        other: 'Other',
+      };
+      const totalErr = Object.values(ws.errors).reduce((s, v) => s + v, 0);
+      let ecHtml = '';
+      for (const [cat, count] of Object.entries(ws.errors)) {
+        ecHtml += `<div class="err-cat">
+          <span class="cat-name">${catLabels[cat] || cat}</span>
+          <span class="cat-cnt ${count > 0 ? 'nonzero' : 'zero'}">${count}</span>
+        </div>`;
+      }
+      ecHtml += `<div class="metric" style="margin-top:6px"><span class="label">total errors</span><span class="value ${totalErr > 0 ? 'red' : 'green'}">${totalErr}</span></div>`;
+      document.getElementById('error-cats').innerHTML = ecHtml;
+    }
+
+    // Recent Errors
+    if (ws && ws.recentErrors && ws.recentErrors.length > 0) {
+      const reHtml = ws.recentErrors.slice().reverse().slice(0, 50).map(e => {
+        const t = new Date(e.ts).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `<div class="recent-err">
+          <span class="re-time">${t}</span>
+          <span class="re-worker">W${e.worker}</span>
+          <span class="re-cat">${e.category}</span>
+          <span class="re-detail" title="${(e.detail || '').replace(/"/g, '&quot;')}">${e.detail || '-'}</span>
+        </div>`;
+      }).join('');
+      document.getElementById('recent-errors').innerHTML = reHtml;
+    }
+
+    // Active Processes table
+    const allProcs = allProcsForLive;
+    if (allProcs.length === 0) {
+      document.getElementById('procs-table').innerHTML = '<div class="empty">no active processes</div>';
+    } else {
+      let rows = allProcs.map(p => {
+        const age = fmt(Date.now() - p.spawnedAt);
+        const idle = fmt(Date.now() - p.lastActivityAt);
+        const isZombie = zombies.zombies.some(z => z.pid === p.pid);
+        const li = p.liveInputTokens || 0;
+        const lo = p.liveOutputTokens || 0;
+        const liveTotal = li + lo;
+        const tokCell = liveTotal > 0
+          ? `<span style="color:var(--orange)">${fmtTok(li)}\u2192${fmtTok(lo)}</span> <span style="color:var(--text2);font-size:10px">(${fmtTok(liveTotal)})</span>`
+          : '<span style="color:var(--text2)">-</span>';
+        return `<tr${isZombie ? ' style="background:rgba(248,81,73,0.1)"' : ''}>
+          <td>${p.pid}</td><td>${modeTag(p.mode)}</td><td>${modelTag(p.model)}</td>
+          <td>${tokCell}</td><td>${age}</td><td>${idle}</td>
+          <td title="${p.source}">${p.source.length > 16 ? '\u2026' + p.source.slice(-14) : p.source}</td>
+          <td title="${p.promptPreview}">${(p.promptPreview || '').slice(0, 24)}\u2026</td>
+          ${isZombie ? '<td style="color:var(--red)">\uD83E\uDDDF</td>' : '<td></td>'}
+        </tr>`;
+      }).join('');
+      document.getElementById('procs-table').innerHTML = `<table>
+        <tr><th>PID</th><th>Mode</th><th>Model</th><th>Tokens</th><th>Age</th><th>Idle</th><th>Source</th><th>Prompt</th><th></th></tr>
+        ${rows}</table>`;
+    }
+
+    // Events
+    if (eventsData.events && eventsData.events.length > 0) {
+      const container = document.getElementById('events-body');
+      for (const ev of eventsData.events) {
+        if (ev.id > lastEventId) lastEventId = ev.id;
+        const row = document.createElement('div');
+        row.className = 'event-row';
+        let tokHtml = '';
+        const inTok = ev.inputTokens || 0;
+        const outTok = ev.outputTokens || 0;
+        if (inTok > 0 || outTok > 0) tokHtml = `${fmtTok(inTok)}\u2192${fmtTok(outTok)}`;
+        const skipKeys = new Set(['id', 'type', 'ts', 'isoTs', 'inputTokens', 'outputTokens']);
+        const detail = Object.entries(ev).filter(([k]) => !skipKeys.has(k)).map(([k, v]) => {
+          const s = String(v); return `${k}=${s.length > 30 ? s.slice(0, 28) + '\u2026' : s}`;
+        }).join(' ');
+        row.innerHTML = `<span class="time">${shortTime(ev.isoTs)}</span><span class="etype ${ev.type}">${ev.type}</span><span class="tokens">${tokHtml}</span><span class="detail">${detail}</span>`;
+        container.prepend(row);
+      }
+      while (container.children.length > 200) container.removeChild(container.lastChild);
+    }
+
+  } catch (err) {
+    document.getElementById('status-dot').className = 'dot err';
+    document.getElementById('refresh-note').textContent = 'error: ' + err.message;
+  }
+}
+
+// ── SSE Live Stream ──
+const activeStreams = new Map(); // reqId -> { el, bodyEl, text }
+let sseConnected = false;
+
+function initSSE() {
+  const es = new EventSource(BASE + '/stream');
+  const dot = document.getElementById('sse-dot');
+
+  es.addEventListener('connected', () => {
+    sseConnected = true;
+    dot.classList.add('connected');
+  });
+
+  es.addEventListener('request', (e) => {
+    const d = JSON.parse(e.data);
+    if (d.mode !== 'stream') return;
+    const feeds = document.getElementById('stream-feeds');
+    // Remove placeholder
+    const placeholder = feeds.querySelector('.empty');
+    if (placeholder) placeholder.remove();
+
+    // Create stream item
+    const item = document.createElement('div');
+    item.className = 'stream-item';
+    item.id = 'stream-' + d.reqId;
+    item.innerHTML = `
+      <div class="stream-item-header">
+        ${modelTag(d.model)} ${modeTag('stream')}
+        <span class="sid">${d.reqId.slice(-8)}</span>
+        <span class="stok" id="stok-${d.reqId}">0 chars</span>
+      </div>
+      <div class="stream-item-body" id="sbody-${d.reqId}"><span class="cursor"></span></div>`;
+    feeds.prepend(item);
+
+    activeStreams.set(d.reqId, { el: item, text: '' });
+
+    // Keep max 5 stream items
+    while (feeds.children.length > 5) feeds.removeChild(feeds.lastChild);
+  });
+
+  es.addEventListener('chunk', (e) => {
+    const d = JSON.parse(e.data);
+    const stream = activeStreams.get(d.reqId);
+    if (!stream) return;
+
+    stream.text += d.text;
+    const body = document.getElementById('sbody-' + d.reqId);
+    if (body) {
+      // Show last 500 chars + cursor
+      const display = stream.text.length > 500 ? '\u2026' + stream.text.slice(-500) : stream.text;
+      body.innerHTML = display.replace(/</g, '&lt;') + '<span class="cursor"></span>';
+      body.scrollTop = body.scrollHeight;
+    }
+    const tokEl = document.getElementById('stok-' + d.reqId);
+    if (tokEl) tokEl.textContent = fmtTok(d.tokens) + ' chars';
+  });
+
+  es.addEventListener('complete', (e) => {
+    const d = JSON.parse(e.data);
+    const stream = activeStreams.get(d.reqId);
+    if (!stream) return;
+
+    // Remove cursor, add completion indicator
+    const body = document.getElementById('sbody-' + d.reqId);
+    if (body) {
+      const cursor = body.querySelector('.cursor');
+      if (cursor) cursor.remove();
+    }
+    const tokEl = document.getElementById('stok-' + d.reqId);
+    if (tokEl) {
+      tokEl.innerHTML = `<span style="color:var(--green)">\u2713</span> ${fmtTok(d.inputTokens)} in \u2192 ${fmtTok(d.outputTokens)} out`;
+    }
+
+    // Fade out after 30s
+    setTimeout(() => {
+      const el = document.getElementById('stream-' + d.reqId);
+      if (el) { el.style.opacity = '0.4'; }
+    }, 30000);
+
+    activeStreams.delete(d.reqId);
+  });
+
+  es.onerror = () => {
+    sseConnected = false;
+    dot.classList.remove('connected');
+    // EventSource auto-reconnects
+  };
+}
+
+// ── Init ──
+initCharts();
+setupTabs();
+initSSE();
+refresh();
+fetchHistory();
+setInterval(refresh, 2000);
+setInterval(fetchHistory, 10000); // refresh charts every 10s
+</script>
+</body>
+</html>

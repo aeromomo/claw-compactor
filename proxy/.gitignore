@@ -1,0 +1,7 @@
+node_modules/
+data/
+*.log
+*.err
+.env
+.env.*
+task-tracker.json
