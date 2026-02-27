@@ -204,6 +204,25 @@ function recordWorkerError(workerName, category, detail) {
 // Falls back to single-worker mode when one worker is rate-limited
 let _loadBalanceMode = true;
 
+// Active connection tracking — for least-connections routing
+const _activeConns = new Map(_workerPool.map(w => [w.name, 0]));
+function workerAcquire(name) { _activeConns.set(name, (_activeConns.get(name) || 0) + 1); }
+function workerRelease(name) { const v = _activeConns.get(name) || 0; _activeConns.set(name, Math.max(0, v - 1)); }
+function leastLoadedWorker(pool) {
+  let best = pool[0];
+  let bestConns = _activeConns.get(best.name) ?? Infinity;
+  let bestTotal = workerStats.traffic[best.name]?.requests ?? 0;
+  for (let i = 1; i < pool.length; i++) {
+    const c = _activeConns.get(pool[i].name) ?? 0;
+    const t = workerStats.traffic[pool[i].name]?.requests ?? 0;
+    // Primary: least active connections; Secondary: least total requests (evens out over time)
+    if (c < bestConns || (c === bestConns && t < bestTotal)) {
+      best = pool[i]; bestConns = c; bestTotal = t;
+    }
+  }
+  return best;
+}
+
 /**
  * Get the next worker, respecting session affinity when available.
  *
@@ -212,24 +231,10 @@ let _loadBalanceMode = true;
  */
 function getNextWorker(sessionKey) {
   const isHealthy = (name) => !_workerHealth.get(name)?.limited;
-
-  // --- Session affinity: try to reuse the same worker ---
-  if (sessionKey) {
-    const aff = sessionAffinity.lookup(sessionKey, isHealthy);
-    if (aff?.hit) {
-      // Affinity match, worker is healthy — use it
-      const w = _workerPool.find((w) => w.name === aff.workerName);
-      if (w) return w;
-    }
-    // aff exists but worker unhealthy → fall through to pick a new one,
-    // then reassign below (caller uses assignAffinityAfterRoute)
-  }
-
-  // --- No affinity or affinity worker unavailable: normal routing ---
-  const healthy = _workerPool.filter((w) => !_workerHealth.get(w.name).limited);
+  const healthy = _workerPool.filter((w) => isHealthy(w.name));
 
   if (healthy.length === 0) {
-    // All workers limited — pick the one that was limited longest ago (most likely recovered)
+    // All workers limited — pick the one that was limited longest ago
     const sorted = [..._workerPool].sort(
       (a, b) => _workerHealth.get(a.name).limitedAt - _workerHealth.get(b.name).limitedAt,
     );
@@ -241,16 +246,30 @@ function getNextWorker(sessionKey) {
     return healthy[0];
   }
 
-  // Multiple healthy workers available
+  // Degraded mode: only use primary
   if (!_loadBalanceMode) {
     const primary = healthy.find((w) => w.name === PRIMARY_WORKER);
     return primary || healthy[0];
   }
 
-  // Load-balance mode: round-robin among all healthy workers
-  const worker = healthy[_rrIndex % healthy.length];
-  _rrIndex++;
-  return worker;
+  // --- Least-connections is primary strategy ---
+  // Session affinity is only a tiebreaker when workers have equal load.
+  const least = leastLoadedWorker(healthy);
+  const leastConns = _activeConns.get(least.name) || 0;
+
+  if (sessionKey) {
+    const aff = sessionAffinity.lookup(sessionKey, isHealthy);
+    if (aff?.hit) {
+      const affinityWorker = _workerPool.find((w) => w.name === aff.workerName);
+      if (affinityWorker) {
+        const affConns = _activeConns.get(affinityWorker.name) || 0;
+        // Use affinity only if it's strictly less loaded (not just equal)
+        if (affConns < leastConns) return affinityWorker;
+      }
+    }
+  }
+
+  return least;
 }
 
 function markWorkerLimited(workerName) {
@@ -432,7 +451,7 @@ const tokenTracker = createTokenTracker({ redis });
 const metricsStore = createMetricsStore({ redis });
 
 // Session affinity: sticky routing for conversation sessions
-const sessionAffinity = createSessionAffinity({ ttlMs: 30 * 60 * 1000 });
+const sessionAffinity = createSessionAffinity({ ttlMs: 5 * 60 * 1000 }); // 5 min — short TTL for better distribution
 
 // Wire reaper events into event log + SSE
 registry.onReap((zombie) => {
@@ -593,6 +612,7 @@ function runCliOnce(prompt, model, systemPrompt, requestId = "", source = "", wo
     if (sessionKey) sessionAffinity.assign(sessionKey, worker.name);
     console.log(`[${ts()}] CLIROUTER obj=${worker.name} bin=${worker.bin} reqId=${requestId} model=${model}`);
     recordWorkerRequest(worker.name);
+    workerAcquire(worker.name);
     const proc = spawn(worker.bin, args, {
       env: workerEnv(worker),
       stdio: ["pipe", "pipe", "pipe"],
@@ -637,6 +657,7 @@ function runCliOnce(prompt, model, systemPrompt, requestId = "", source = "", wo
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
     proc.on("close", (code) => {
       clearTimeout(execTimer);
+      workerRelease(worker.name);
       if (proc.pid) registry.unregister(proc.pid);
       // Detect rate limit from stderr
       if (isRateLimitError(code, stderr)) {
@@ -654,6 +675,7 @@ function runCliOnce(prompt, model, systemPrompt, requestId = "", source = "", wo
     });
     proc.on("error", (err) => {
       clearTimeout(execTimer);
+      workerRelease(worker.name);
       if (proc.pid) registry.unregister(proc.pid);
       err.workerName = worker.name;
       reject(err);
@@ -1477,6 +1499,7 @@ async function handleCompletions(req, res) {
       triedRouters.add(worker.name);
       console.log(`[${ts()}] CLIROUTER obj=${worker.name} bin=${worker.bin} reqId=${reqId} model=${model} src=${source}${isRetry ? ` RETRY#${retryCount}` : ""}`);
       recordWorkerRequest(worker.name);
+      workerAcquire(worker.name);
       const proc = spawnCliStream(prompt, model, systemPrompt, worker);
       activeProc = proc;  // update for client-disconnect handler
       trackStreamProc(proc, reqId, model, source, worker);
@@ -1592,6 +1615,7 @@ async function handleCompletions(req, res) {
         clearTimeout(heartbeatTimer);
         clearTimeout(execTimer);
         clearInterval(keepaliveInterval);
+        workerRelease(worker.name);
 
         // Quick-fail auto-retry: if worker failed fast with no content, try another
         const elapsed = Date.now() - proc._spawnedAt;
@@ -1667,6 +1691,7 @@ async function handleCompletions(req, res) {
         clearTimeout(heartbeatTimer);
         clearTimeout(execTimer);
         clearInterval(keepaliveInterval);
+        workerRelease(worker.name);
         // Quick-fail auto-retry on spawn error too
         if (!sentContent && retryCount < MAX_RETRIES) {
           const untried = _workerPool.find(
@@ -1784,6 +1809,7 @@ function handleMetrics(req, res) {
     },
     sessionAffinity: sessionAffinity.getStats(),
     workerStats,
+    activeConnections: Object.fromEntries(_activeConns),
   });
 }
 

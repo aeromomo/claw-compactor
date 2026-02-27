@@ -218,22 +218,28 @@
     </div>
   </div>
 
-  <!-- Worker Traffic + Error Stats -->
+  <!-- Token Usage + Worker Traffic -->
   <div class="bottom-panels">
+    <div class="card">
+      <h2>Token Usage</h2>
+      <div id="token-usage"><div class="empty">loading...</div></div>
+    </div>
     <div class="card">
       <h2>Worker Traffic</h2>
       <div id="worker-traffic"><div class="empty">loading...</div></div>
     </div>
+  </div>
+
+  <!-- Error Categories + Recent Errors -->
+  <div class="bottom-panels">
     <div class="card">
       <h2>Error Categories</h2>
       <div id="error-cats"><div class="empty">loading...</div></div>
     </div>
-  </div>
-
-  <!-- Recent Errors -->
-  <div class="card scroll-card" style="margin-bottom: 12px">
-    <h2>Recent Errors</h2>
-    <div id="recent-errors"><div class="empty">no errors yet</div></div>
+    <div class="card scroll-card" style="max-height:240px">
+      <h2>Recent Errors</h2>
+      <div id="recent-errors"><div class="empty">no errors yet</div></div>
+    </div>
   </div>
 
   <!-- Active Processes + Event Log -->
@@ -505,17 +511,41 @@ async function refresh() {
       <div class="metric"><span class="label">reaped / killed</span><span class="value">${p.session?.reaped || 0}<span style="color:var(--text2);font-size:10px;margin:0 2px">/</span>${p.session?.killed || 0} <span style="color:var(--text2);font-size:10px">/ ${pm.totalReaped}·${pm.totalKilled} total</span></span></div>
     `;
 
+    // Token Usage Windows
+    const usage = metrics.tokens?.usage;
+    if (usage) {
+      const windows = [
+        { key: 'last1h', label: 'Last 1 Hour' },
+        { key: 'last4h', label: 'Last 4 Hours' },
+        { key: 'last8h', label: 'Last 8 Hours' },
+        { key: 'thisWeek', label: 'This Week' },
+      ];
+      let tuHtml = '';
+      for (const w of windows) {
+        const u = usage[w.key] || { input: 0, output: 0, total: 0, requests: 0 };
+        const isWeek = w.key === 'thisWeek';
+        tuHtml += `<div class="metric">
+          <span class="label">${w.label}</span>
+          <span class="value ${isWeek ? 'blue' : ''}">${fmtTok(u.total)} <span style="color:var(--text2);font-size:10px">(${fmtTok(u.input)}in ${fmtTok(u.output)}out · ${u.requests}req)</span></span>
+        </div>`;
+      }
+      document.getElementById('token-usage').innerHTML = tuHtml;
+    }
+
     // Worker Traffic
     const ws = metrics.workerStats;
     if (ws && ws.traffic) {
       const entries = Object.entries(ws.traffic);
       const totalReqs = entries.reduce((s, [, v]) => s + v.requests, 0) || 1;
+      const ac = metrics.activeConnections || {};
       let wtHtml = '';
       for (const [name, data] of entries) {
         const pctReq = Math.round((data.requests / totalReqs) * 100);
         const lastAgo = data.lastReqAt ? fmt(Date.now() - data.lastReqAt) : '-';
+        const active = ac[name] || 0;
+        const activeTag = active > 0 ? `<span style="color:var(--green);font-size:10px;margin-left:4px">●${active}</span>` : '';
         wtHtml += `<div class="worker-row">
-          <span class="wname">W${name}</span>
+          <span class="wname">W${name}${activeTag}</span>
           <div class="wbar">
             <div class="wbar-fill" style="width:${pctReq}%;background:var(--blue)"></div>
             ${data.errors > 0 ? `<span class="wbar-err">${data.errors} err</span>` : ''}
@@ -524,7 +554,8 @@ async function refresh() {
           <span class="wlast">${lastAgo}</span>
         </div>`;
       }
-      wtHtml += `<div class="metric" style="margin-top:6px"><span class="label">total requests</span><span class="value blue">${totalReqs === 1 && entries.every(([,v]) => v.requests === 0) ? 0 : entries.reduce((s, [,v]) => s + v.requests, 0)}</span></div>`;
+      const actualTotal = entries.reduce((s, [,v]) => s + v.requests, 0);
+      wtHtml += `<div class="metric" style="margin-top:6px"><span class="label">total requests</span><span class="value blue">${actualTotal}</span></div>`;
       document.getElementById('worker-traffic').innerHTML = wtHtml;
     }
 

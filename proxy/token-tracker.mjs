@@ -307,12 +307,56 @@ export function createTokenTracker({ redis } = {}) {
   }
 
   /**
+   * Get token usage within specific time windows.
+   * Iterates per-request snapshots and sums tokens by window.
+   *
+   * @returns {{ last1h, last4h, last8h, thisWeek: { input, output, total, requests } }}
+   */
+  function getUsageByWindow() {
+    const now = Date.now();
+    const cutoffs = {
+      last1h: now - 3600_000,
+      last4h: now - 4 * 3600_000,
+      last8h: now - 8 * 3600_000,
+    };
+    // This week = Monday 00:00 local time
+    const d = new Date();
+    const dayOfWeek = d.getDay();
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysSinceMonday, 0, 0, 0);
+    cutoffs.thisWeek = monday.getTime();
+
+    const buckets = {};
+    for (const key of Object.keys(cutoffs)) {
+      buckets[key] = { input: 0, output: 0, total: 0, requests: 0 };
+    }
+
+    for (const [, snap] of requests) {
+      const ts = snap.ts || 0;
+      for (const [window, cutoff] of Object.entries(cutoffs)) {
+        if (ts >= cutoff) {
+          const b = buckets[window];
+          buckets[window] = {
+            input: b.input + (snap.input || 0),
+            output: b.output + (snap.output || 0),
+            total: b.total + (snap.input || 0) + (snap.output || 0),
+            requests: b.requests + 1,
+          };
+        }
+      }
+    }
+
+    return Object.freeze(buckets);
+  }
+
+  /**
    * Full stats for API/dashboard.
    */
   function getStats() {
     return Object.freeze({
       byModel: getByModel(),
       totals: getTotals(),
+      usage: getUsageByWindow(),
     });
   }
 
