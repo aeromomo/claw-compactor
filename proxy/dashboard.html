@@ -20,13 +20,14 @@
   .header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10; }
   .header h1 { font-size: 15px; font-weight: 600; color: var(--blue); white-space: nowrap; }
   .header .version { color: var(--text2); font-size: 12px; }
+  .header .mode-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 600; }
+  .header .mode-badge.cli { background: rgba(63,185,80,0.15); color: var(--green); }
+  .header .mode-badge.api { background: rgba(188,140,255,0.15); color: var(--purple); }
   .header .status { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .dot { width: 8px; height: 8px; border-radius: 50%; }
   .dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .dot.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
   .refresh-note { color: var(--text2); font-size: 11px; }
-
-  /* Hide header when embedded in portal iframe */
   .in-iframe .header { display: none; }
 
   /* Token Overview Strip */
@@ -37,6 +38,8 @@
   .tok-cell .tok-label .model-dot { width: 6px; height: 6px; border-radius: 50%; }
   .tok-cell .tok-big { font-size: 22px; font-weight: 700; line-height: 1.2; }
   .tok-cell .tok-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .tok-cell .tok-windows { font-size: 10px; color: var(--text2); margin-top: 4px; line-height: 1.6; }
+  .tok-cell .tok-windows .tw-val { color: var(--text); font-weight: 500; }
   .tok-cell.total .tok-big { color: var(--blue); }
   .tok-cell.opus .tok-big { color: var(--opus); }
   .tok-cell.sonnet .tok-big { color: var(--sonnet); }
@@ -62,10 +65,11 @@
   .tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
   .chart-wrap { height: 220px; position: relative; }
 
-  /* System panels */
-  .sys-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  /* Cards & panels */
+  .ops-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
   .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
-  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 8px; }
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .card h2 .section-count { font-size: 10px; color: var(--text2); font-weight: 400; }
   .metric { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; }
   .metric .label { color: var(--text2); font-size: 12px; }
   .metric .value { font-weight: 600; font-size: 13px; }
@@ -77,6 +81,10 @@
   .bar-bg { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
   .bar-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--text2); margin-top: 1px; }
+
+  /* Divider inside card */
+  .card-divider { border: none; border-top: 1px solid var(--bg3); margin: 8px 0; }
+  .sub-heading { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2); margin-bottom: 6px; font-weight: 600; }
 
   /* Tags */
   .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 500; }
@@ -96,18 +104,24 @@
   .worker-row .wlast { width: 60px; font-size: 10px; color: var(--text2); text-align: right; }
 
   /* Error category list */
-  .err-cat { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--bg3); }
-  .err-cat .cat-name { font-size: 12px; color: var(--text2); }
-  .err-cat .cat-cnt { font-weight: 600; font-size: 13px; min-width: 30px; text-align: right; }
+  .err-cat { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+  .err-cat .cat-name { font-size: 11px; color: var(--text2); }
+  .err-cat .cat-cnt { font-weight: 600; font-size: 12px; min-width: 24px; text-align: right; }
   .err-cat .cat-cnt.zero { color: var(--text2); }
   .err-cat .cat-cnt.nonzero { color: var(--red); }
 
   /* Recent errors */
-  .recent-err { display: flex; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--bg3); font-size: 11px; align-items: baseline; }
-  .recent-err .re-time { color: var(--text2); flex-shrink: 0; width: 60px; }
-  .recent-err .re-worker { color: var(--blue); flex-shrink: 0; width: 24px; font-weight: 600; }
-  .recent-err .re-cat { color: var(--red); flex-shrink: 0; width: 90px; font-weight: 500; }
+  .recent-err { display: flex; gap: 5px; padding: 2px 0; border-bottom: 1px solid var(--bg3); font-size: 10px; align-items: baseline; }
+  .recent-err .re-time { color: var(--text2); flex-shrink: 0; width: 55px; }
+  .recent-err .re-worker { color: var(--blue); flex-shrink: 0; width: 22px; font-weight: 600; }
+  .recent-err .re-cat { color: var(--red); flex-shrink: 0; width: 80px; font-weight: 500; }
   .recent-err .re-detail { color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Config param rows */
+  .cfg-row { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 0; }
+  .cfg-row .cfg-key { font-size: 11px; color: var(--text2); }
+  .cfg-row .cfg-val { font-size: 11px; font-weight: 600; color: var(--text); }
+  .cfg-row .cfg-val.highlight { color: var(--green); }
 
   /* Tables & Events */
   table { width: 100%; border-collapse: collapse; }
@@ -142,6 +156,11 @@
   .stream-item-body { font-size: 12px; color: var(--text); line-height: 1.5; max-height: 80px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; background: var(--bg); border-radius: 4px; padding: 6px 8px; }
   .stream-item-body .cursor { display: inline-block; width: 2px; height: 12px; background: var(--blue); animation: blink 1s steps(1) infinite; vertical-align: text-bottom; margin-left: 1px; }
   @keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+
+  /* Session affinity stats */
+  .aff-stats { display: flex; gap: 12px; font-size: 10px; color: var(--text2); margin-top: 4px; }
+  .aff-stats span { display: flex; align-items: center; gap: 3px; }
+  .aff-stats .aval { font-weight: 600; color: var(--text); }
 </style>
 </head>
 <body>
@@ -151,13 +170,14 @@
 <div class="header">
   <h1>&#9889; Claude Code Proxy</h1>
   <span class="version" id="version">-</span>
+  <span class="mode-badge" id="mode-badge">-</span>
   <div class="status">
     <span class="refresh-note" id="refresh-note">loading...</span>
     <span class="dot" id="status-dot"></span>
   </div>
 </div>
 
-<!-- Token Overview Strip -->
+<!-- Token Overview Strip (with usage windows integrated) -->
 <div class="tok-strip" id="tok-strip"></div>
 
 <!-- Live Activity Bar -->
@@ -196,62 +216,43 @@
     </div>
   </div>
 
-  <!-- Live Stream Feed -->
-  <div class="stream-panel">
-    <h2><span class="sse-dot" id="sse-dot"></span> Live Stream</h2>
-    <div class="stream-feeds" id="stream-feeds"><div class="empty">waiting for streams...</div></div>
+  <!-- ═══ OPERATIONS HUB — 3 columns ═══ -->
+  <div class="ops-grid">
+    <!-- Column 1: Workers & Queue -->
+    <div class="card">
+      <h2>Workers &amp; Queue</h2>
+      <div id="workers-queue-body"><div class="empty">loading...</div></div>
+    </div>
+
+    <!-- Column 2: Health & Errors -->
+    <div class="card scroll-card" style="max-height:420px">
+      <h2>Health &amp; Errors</h2>
+      <div id="health-errors-body"><div class="empty">loading...</div></div>
+    </div>
+
+    <!-- Column 3: Config & Parameters -->
+    <div class="card scroll-card" style="max-height:420px">
+      <h2>Config &amp; Parameters</h2>
+      <div id="config-body"><div class="empty">loading...</div></div>
+    </div>
   </div>
 
-  <!-- System Status Row -->
-  <div class="sys-grid">
-    <div class="card">
-      <h2>Queue &amp; Health</h2>
-      <div id="queue-body"><div class="empty">loading...</div></div>
-    </div>
-    <div class="card">
-      <h2>Rate Limits</h2>
-      <div id="rates-body"><div class="empty">loading...</div></div>
-    </div>
-    <div class="card">
-      <h2>Processes</h2>
-      <div id="proc-body"><div class="empty">loading...</div></div>
-    </div>
-  </div>
-
-  <!-- Token Usage + Worker Traffic -->
+  <!-- Live Stream + Active Processes -->
   <div class="bottom-panels">
-    <div class="card">
-      <h2>Token Usage</h2>
-      <div id="token-usage"><div class="empty">loading...</div></div>
+    <div class="stream-panel">
+      <h2><span class="sse-dot" id="sse-dot"></span> Live Stream</h2>
+      <div class="stream-feeds" id="stream-feeds"><div class="empty">waiting for streams...</div></div>
     </div>
-    <div class="card">
-      <h2>Worker Traffic</h2>
-      <div id="worker-traffic"><div class="empty">loading...</div></div>
-    </div>
-  </div>
-
-  <!-- Error Categories + Recent Errors -->
-  <div class="bottom-panels">
-    <div class="card">
-      <h2>Error Categories</h2>
-      <div id="error-cats"><div class="empty">loading...</div></div>
-    </div>
-    <div class="card scroll-card" style="max-height:240px">
-      <h2>Recent Errors</h2>
-      <div id="recent-errors"><div class="empty">no errors yet</div></div>
-    </div>
-  </div>
-
-  <!-- Active Processes + Event Log -->
-  <div class="bottom-panels">
     <div class="card scroll-card">
       <h2>Active Processes</h2>
       <div id="procs-table"><div class="empty">no active processes</div></div>
     </div>
-    <div class="card scroll-card">
-      <h2>Event Log</h2>
-      <div id="events-body"><div class="empty">waiting for events...</div></div>
-    </div>
+  </div>
+
+  <!-- Event Log (full width) -->
+  <div class="card scroll-card" style="max-height:300px">
+    <h2>Event Log</h2>
+    <div id="events-body"><div class="empty">waiting for events...</div></div>
   </div>
 </div>
 
@@ -270,6 +271,11 @@ function fmt(ms) {
   if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
   if (ms < 3600000) return (ms / 60000).toFixed(1) + 'm';
   return (ms / 3600000).toFixed(1) + 'h';
+}
+function fmtMs(ms) {
+  if (ms >= 3600000) return (ms / 3600000) + 'hr';
+  if (ms >= 60000) return (ms / 60000) + 'min';
+  return (ms / 1000) + 's';
 }
 function fmtTok(n) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -342,35 +348,24 @@ function initCharts() {
 
 function updateCharts(points) {
   if (!tokChart || !reqChart || !points || points.length === 0) return;
-
   const labels = points.map(p => chartTime(p.ts));
-
-  // Per-interval delta: show real-time usage per period, not cumulative
-  // Handles counter resets (server restarts) by clamping negatives to 0
   function deltas(arr) {
     return arr.map((v, i) => {
       if (i === 0) return 0;
       const d = v - arr[i - 1];
-      return d >= 0 ? d : 0; // clamp negative (counter reset) to 0
+      return d >= 0 ? d : 0;
     });
   }
-
-  const tokTotals = points.map(p => p.tokT);
-  const tokInputs = points.map(p => p.tokI);
-  const tokOutputs = points.map(p => p.tokO);
-
   tokChart.data.labels = labels;
-  tokChart.data.datasets[0].data = deltas(tokTotals);
-  tokChart.data.datasets[1].data = deltas(tokInputs);
-  tokChart.data.datasets[2].data = deltas(tokOutputs);
+  tokChart.data.datasets[0].data = deltas(points.map(p => p.tokT));
+  tokChart.data.datasets[1].data = deltas(points.map(p => p.tokI));
+  tokChart.data.datasets[2].data = deltas(points.map(p => p.tokO));
   tokChart.update('none');
 
-  const reqComp = points.map(p => p.reqCompleted);
-
   reqChart.data.labels = labels;
-  reqChart.data.datasets[0].data = deltas(reqComp);
-  reqChart.data.datasets[1].data = points.map(p => p.reqActive);   // active is point-in-time, not cumulative
-  reqChart.data.datasets[2].data = points.map(p => p.reqErrors);   // errors is point-in-time
+  reqChart.data.datasets[0].data = deltas(points.map(p => p.reqCompleted));
+  reqChart.data.datasets[1].data = points.map(p => p.reqActive);
+  reqChart.data.datasets[2].data = points.map(p => p.reqErrors);
   reqChart.update('none');
 }
 
@@ -381,13 +376,11 @@ function setupTabs() {
       const btn = e.target.closest('.tab-btn');
       if (!btn) return;
       currentWindow = btn.dataset.w;
-      // Sync both tab groups
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.w === currentWindow));
       fetchHistory();
     });
   }
 }
-
 async function fetchHistory() {
   try {
     const data = await fetchJson('/metrics/history?window=' + currentWindow);
@@ -405,16 +398,23 @@ async function refresh() {
       fetchJson('/events?since_id=' + lastEventId + '&limit=100'),
     ]);
 
-    // Header status
-    document.getElementById('version').textContent = 'v0.4.0';
+    // Header
+    const cfg = metrics.config || {};
+    document.getElementById('version').textContent = 'v0.7.0';
     document.getElementById('status-dot').className = 'dot ok';
     document.getElementById('refresh-note').textContent = 'live \u00b7 ' + fmt(Date.now() - startTime);
+    const modeBadge = document.getElementById('mode-badge');
+    if (cfg.useCliAgents) {
+      modeBadge.className = 'mode-badge cli';
+      modeBadge.textContent = 'CLI Agents';
+    } else {
+      modeBadge.className = 'mode-badge api';
+      modeBadge.textContent = 'API Direct';
+    }
 
-    // Token Overview Strip — total = completed (historical + session) + live active
+    // ── Token Overview Strip (with usage windows in Total cell) ──
     const tok = metrics.tokens || { totals: { input: 0, output: 0, total: 0, requests: 0 }, byModel: {} };
     const live = metrics.processes?.liveTokens || { input: 0, output: 0, total: 0 };
-
-    // Compute live tokens per-model from active process list
     const liveByModel = {};
     const allProcsForLive = zombies.processes || [];
     for (const p of allProcsForLive) {
@@ -426,17 +426,29 @@ async function refresh() {
       }
     }
 
-    // Grand total = completed + live
     const grandInput = tok.totals.input + live.input;
     const grandOutput = tok.totals.output + live.output;
     const grandTotal = grandInput + grandOutput;
     const grandReqs = tok.totals.requests;
+
+    // Token usage windows
+    const usage = tok.usage || {};
+    const u1h = usage.last1h || { total: 0, requests: 0 };
+    const u4h = usage.last4h || { total: 0, requests: 0 };
+    const u8h = usage.last8h || { total: 0, requests: 0 };
+    const uWk = usage.thisWeek || { total: 0, requests: 0 };
 
     let stripHtml = `
       <div class="tok-cell total">
         <div class="tok-label"><span class="model-dot" style="background:var(--blue)"></span>Total</div>
         <div class="tok-big">${fmtTok(grandTotal)}</div>
         <div class="tok-sub">${fmtTok(grandInput)} in \u2192 ${fmtTok(grandOutput)} out \u00b7 ${grandReqs} req</div>
+        <div class="tok-windows">
+          1h <span class="tw-val">${fmtTok(u1h.total)}</span> \u00b7
+          4h <span class="tw-val">${fmtTok(u4h.total)}</span> \u00b7
+          8h <span class="tw-val">${fmtTok(u8h.total)}</span> \u00b7
+          wk <span class="tw-val">${fmtTok(uWk.total)}</span>
+        </div>
       </div>`;
     for (const model of ['opus', 'sonnet', 'haiku']) {
       const completed = tok.byModel[model];
@@ -472,10 +484,48 @@ async function refresh() {
       liveBar.style.display = 'none';
     }
 
-    // Queue & Health
+    // ═══ COLUMN 1: Workers & Queue ═══
     const q = metrics.queue;
     const qm = q.metrics;
-    document.getElementById('queue-body').innerHTML = `
+    const ws = metrics.workerStats;
+    const ac = metrics.activeConnections || {};
+    const sa = metrics.sessionAffinity || {};
+
+    let col1 = '';
+
+    // Worker traffic bars
+    if (ws && ws.traffic) {
+      const entries = Object.entries(ws.traffic);
+      const totalReqs = entries.reduce((s, [, v]) => s + v.requests, 0) || 1;
+      for (const [name, data] of entries) {
+        const pctReq = Math.round((data.requests / totalReqs) * 100);
+        const lastAgo = data.lastReqAt ? fmt(Date.now() - data.lastReqAt) : '-';
+        const active = ac[name] || 0;
+        const activeTag = active > 0 ? `<span style="color:var(--green);font-size:10px;margin-left:4px">\u25CF${active}</span>` : '';
+        col1 += `<div class="worker-row">
+          <span class="wname">W${name}${activeTag}</span>
+          <div class="wbar">
+            <div class="wbar-fill" style="width:${pctReq}%;background:var(--blue)"></div>
+            ${data.errors > 0 ? `<span class="wbar-err">${data.errors}err</span>` : ''}
+            <span class="wbar-label">${data.requests} (${pctReq}%)</span>
+          </div>
+          <span class="wlast">${lastAgo}</span>
+        </div>`;
+      }
+    }
+
+    // Session affinity mini stats
+    col1 += `<div class="aff-stats">
+      <span>hit <span class="aval">${sa.hitRate || '0%'}</span></span>
+      <span>sessions <span class="aval">${sa.activeSessions || 0}</span></span>
+      <span>reassign <span class="aval">${sa.reassigns || 0}</span></span>
+    </div>`;
+
+    col1 += '<hr class="card-divider">';
+
+    // Queue metrics
+    col1 += `<div class="sub-heading">Queue</div>`;
+    col1 += `
       <div class="metric"><span class="label">active / max</span><span class="value ${q.active > 0 ? 'blue' : 'green'}">${q.active} / ${q.maxConcurrent}</span></div>
       <div class="metric"><span class="label">queued</span><span class="value ${q.totalQueued > 0 ? 'yellow' : ''}">${q.totalQueued}</span></div>
       <div class="metric"><span class="label">processed</span><span class="value">${qm.totalProcessed}</span></div>
@@ -484,87 +534,51 @@ async function refresh() {
       <div class="metric"><span class="label">leaked</span><span class="value ${qm.totalLeaked > 0 ? 'yellow' : ''}">${qm.totalLeaked}</span></div>
     `;
 
-    // Rate Limits
-    const ru = metrics.rateUsage;
-    const rl = metrics.rateLimits;
-    let ratesHtml = '';
-    for (const model of ['opus', 'sonnet', 'haiku']) {
-      const usage = ru[model];
-      if (!usage) continue;
-      const reqUsed = parseInt(usage.requests) || 0;
-      const reqMax = rl[model].requestsPerMin;
-      const tokUsed = parseInt(usage.tokens.replace('~', '')) || 0;
-      const tokMax = rl[model].tokensPerMin;
-      ratesHtml += `<div style="margin-bottom:6px">${modelTag(model)} ${rateBar('req/min', reqUsed, reqMax)} ${rateBar('tok/min', tokUsed, tokMax)}</div>`;
-    }
-    document.getElementById('rates-body').innerHTML = ratesHtml || '<div class="empty">idle</div>';
+    col1 += '<hr class="card-divider">';
 
-    // Processes
+    // Process stats
     const p = metrics.processes;
     const pm = p.metrics;
-    document.getElementById('proc-body').innerHTML = `
+    col1 += `<div class="sub-heading">Processes</div>`;
+    col1 += `
       <div class="metric"><span class="label">tracked</span><span class="value blue">${p.total}</span></div>
       <div class="metric"><span class="label">sync / stream</span><span class="value">${p.byMode.sync} / ${p.byMode.stream}</span></div>
       ${Object.entries(p.byModel || {}).map(([m, c]) => `<div class="metric"><span class="label">${modelTag(m)}</span><span class="value">${c}</span></div>`).join('')}
       <div class="metric"><span class="label">zombies</span><span class="value ${zombies.zombies.length > 0 ? 'red' : 'green'}">${zombies.zombies.length}</span></div>
-      <div class="metric"><span class="label">registered</span><span class="value">${p.session?.registered || 0} <span style="color:var(--text2);font-size:10px">/ ${pm.totalRegistered} total</span></span></div>
-      <div class="metric"><span class="label">reaped / killed</span><span class="value">${p.session?.reaped || 0}<span style="color:var(--text2);font-size:10px;margin:0 2px">/</span>${p.session?.killed || 0} <span style="color:var(--text2);font-size:10px">/ ${pm.totalReaped}·${pm.totalKilled} total</span></span></div>
+      <div class="metric"><span class="label">registered</span><span class="value">${p.session?.registered || 0} <span style="color:var(--text2);font-size:10px">/ ${pm.totalRegistered} all</span></span></div>
+      <div class="metric"><span class="label">reaped / killed</span><span class="value">${p.session?.reaped || 0}<span style="color:var(--text2);font-size:10px;margin:0 2px">/</span>${p.session?.killed || 0}</span></div>
     `;
 
-    // Token Usage Windows
-    const usage = metrics.tokens?.usage;
-    if (usage) {
-      const windows = [
-        { key: 'last1h', label: 'Last 1 Hour' },
-        { key: 'last4h', label: 'Last 4 Hours' },
-        { key: 'last8h', label: 'Last 8 Hours' },
-        { key: 'thisWeek', label: 'This Week' },
-      ];
-      let tuHtml = '';
-      for (const w of windows) {
-        const u = usage[w.key] || { input: 0, output: 0, total: 0, requests: 0 };
-        const isWeek = w.key === 'thisWeek';
-        tuHtml += `<div class="metric">
-          <span class="label">${w.label}</span>
-          <span class="value ${isWeek ? 'blue' : ''}">${fmtTok(u.total)} <span style="color:var(--text2);font-size:10px">(${fmtTok(u.input)}in ${fmtTok(u.output)}out · ${u.requests}req)</span></span>
-        </div>`;
-      }
-      document.getElementById('token-usage').innerHTML = tuHtml;
-    }
+    document.getElementById('workers-queue-body').innerHTML = col1;
 
-    // Worker Traffic
-    const ws = metrics.workerStats;
-    if (ws && ws.traffic) {
-      const entries = Object.entries(ws.traffic);
-      const totalReqs = entries.reduce((s, [, v]) => s + v.requests, 0) || 1;
-      const ac = metrics.activeConnections || {};
-      let wtHtml = '';
-      for (const [name, data] of entries) {
-        const pctReq = Math.round((data.requests / totalReqs) * 100);
-        const lastAgo = data.lastReqAt ? fmt(Date.now() - data.lastReqAt) : '-';
-        const active = ac[name] || 0;
-        const activeTag = active > 0 ? `<span style="color:var(--green);font-size:10px;margin-left:4px">●${active}</span>` : '';
-        wtHtml += `<div class="worker-row">
-          <span class="wname">W${name}${activeTag}</span>
-          <div class="wbar">
-            <div class="wbar-fill" style="width:${pctReq}%;background:var(--blue)"></div>
-            ${data.errors > 0 ? `<span class="wbar-err">${data.errors} err</span>` : ''}
-            <span class="wbar-label">${data.requests} req (${pctReq}%)</span>
-          </div>
-          <span class="wlast">${lastAgo}</span>
-        </div>`;
-      }
-      const actualTotal = entries.reduce((s, [,v]) => s + v.requests, 0);
-      wtHtml += `<div class="metric" style="margin-top:6px"><span class="label">total requests</span><span class="value blue">${actualTotal}</span></div>`;
-      document.getElementById('worker-traffic').innerHTML = wtHtml;
+    // ═══ COLUMN 2: Health & Errors ═══
+    let col2 = '';
+
+    // Rate Limits
+    const ru = metrics.rateUsage;
+    const rl = metrics.rateLimits;
+    col2 += `<div class="sub-heading">Rate Limits</div>`;
+    let hasRates = false;
+    for (const model of ['opus', 'sonnet', 'haiku']) {
+      const u = ru[model];
+      if (!u) continue;
+      hasRates = true;
+      const reqUsed = parseInt(u.requests) || 0;
+      const reqMax = rl[model].requestsPerMin;
+      const tokUsed = parseInt(u.tokens.replace('~', '')) || 0;
+      const tokMax = rl[model].tokensPerMin;
+      col2 += `<div style="margin-bottom:4px">${modelTag(model)} ${rateBar('req/min', reqUsed, reqMax)} ${rateBar('tok/min', tokUsed, tokMax)}</div>`;
     }
+    if (!hasRates) col2 += '<div style="font-size:11px;color:var(--text2);padding:2px 0">idle</div>';
+
+    col2 += '<hr class="card-divider">';
 
     // Error Categories
     if (ws && ws.errors) {
       const catLabels = {
-        cli_crash: 'CLI Crash (code=1)',
-        cli_killed: 'CLI Killed (SIGTERM)',
-        context_overflow: 'Context Overflow',
+        cli_crash: 'CLI Crash',
+        cli_killed: 'CLI Killed',
+        context_overflow: 'Ctx Overflow',
         api_error: 'API Error',
         stream_retry: 'Stream Retry',
         timeout: 'Timeout',
@@ -572,20 +586,20 @@ async function refresh() {
         other: 'Other',
       };
       const totalErr = Object.values(ws.errors).reduce((s, v) => s + v, 0);
-      let ecHtml = '';
+      col2 += `<div class="sub-heading">Errors <span style="font-weight:400;color:${totalErr > 0 ? 'var(--red)' : 'var(--text2)'}">${totalErr}</span></div>`;
       for (const [cat, count] of Object.entries(ws.errors)) {
-        ecHtml += `<div class="err-cat">
+        col2 += `<div class="err-cat">
           <span class="cat-name">${catLabels[cat] || cat}</span>
           <span class="cat-cnt ${count > 0 ? 'nonzero' : 'zero'}">${count}</span>
         </div>`;
       }
-      ecHtml += `<div class="metric" style="margin-top:6px"><span class="label">total errors</span><span class="value ${totalErr > 0 ? 'red' : 'green'}">${totalErr}</span></div>`;
-      document.getElementById('error-cats').innerHTML = ecHtml;
     }
 
     // Recent Errors
     if (ws && ws.recentErrors && ws.recentErrors.length > 0) {
-      const reHtml = ws.recentErrors.slice().reverse().slice(0, 50).map(e => {
+      col2 += '<hr class="card-divider">';
+      col2 += `<div class="sub-heading">Recent</div>`;
+      col2 += ws.recentErrors.slice().reverse().slice(0, 20).map(e => {
         const t = new Date(e.ts).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         return `<div class="recent-err">
           <span class="re-time">${t}</span>
@@ -594,10 +608,59 @@ async function refresh() {
           <span class="re-detail" title="${(e.detail || '').replace(/"/g, '&quot;')}">${e.detail || '-'}</span>
         </div>`;
       }).join('');
-      document.getElementById('recent-errors').innerHTML = reHtml;
     }
 
-    // Active Processes table
+    document.getElementById('health-errors-body').innerHTML = col2;
+
+    // ═══ COLUMN 3: Config & Parameters ═══
+    let col3 = '';
+
+    // Routing
+    col3 += `<div class="sub-heading">Routing</div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">mode</span><span class="cfg-val highlight">${cfg.useCliAgents ? 'CLI Agents' : 'API Direct'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">algorithm</span><span class="cfg-val">${cfg.loadBalanceAlgorithm || 'round-robin'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">workers</span><span class="cfg-val">${cfg.workerCount || '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">session TTL</span><span class="cfg-val">${cfg.sessionAffinityTtlMs ? fmtMs(cfg.sessionAffinityTtlMs) : '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">max retries</span><span class="cfg-val">${cfg.maxRetries ?? '-'}</span></div>`;
+
+    col3 += '<hr class="card-divider">';
+
+    // Concurrency
+    col3 += `<div class="sub-heading">Concurrency</div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">max concurrent</span><span class="cfg-val">${cfg.maxConcurrent ?? '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">queue total</span><span class="cfg-val">${cfg.maxQueueTotal ?? '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">queue/source</span><span class="cfg-val">${cfg.maxQueuePerSource ?? '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">queue timeout</span><span class="cfg-val">${cfg.queueTimeoutMs ? fmtMs(cfg.queueTimeoutMs) : '-'}</span></div>`;
+
+    col3 += '<hr class="card-divider">';
+
+    // Timeouts
+    col3 += `<div class="sub-heading">Timeouts</div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">stream</span><span class="cfg-val">${cfg.streamTimeoutMs ? fmtMs(cfg.streamTimeoutMs) : '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">sync</span><span class="cfg-val">${cfg.syncTimeoutMs ? fmtMs(cfg.syncTimeoutMs) : '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">SSE keepalive</span><span class="cfg-val">${cfg.sseKeepaliveMs ? fmtMs(cfg.sseKeepaliveMs) : '-'}</span></div>`;
+
+    col3 += '<hr class="card-divider">';
+
+    // Process reaper
+    col3 += `<div class="sub-heading">Process Reaper</div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">max age</span><span class="cfg-val">${cfg.maxProcessAgeMs ? fmtMs(cfg.maxProcessAgeMs) : '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">max idle</span><span class="cfg-val">${cfg.maxIdleMs ? fmtMs(cfg.maxIdleMs) : '-'}</span></div>`;
+    col3 += `<div class="cfg-row"><span class="cfg-key">reaper interval</span><span class="cfg-val">${cfg.reaperIntervalMs ? fmtMs(cfg.reaperIntervalMs) : '-'}</span></div>`;
+
+    // Heartbeat
+    if (cfg.heartbeatByModel) {
+      col3 += '<hr class="card-divider">';
+      col3 += `<div class="sub-heading">Heartbeat</div>`;
+      for (const [m, ms] of Object.entries(cfg.heartbeatByModel)) {
+        col3 += `<div class="cfg-row"><span class="cfg-key">${modelTag(m)}</span><span class="cfg-val">${fmtMs(ms)}</span></div>`;
+      }
+      col3 += `<div class="cfg-row"><span class="cfg-key">default</span><span class="cfg-val">${cfg.defaultHeartbeatMs ? fmtMs(cfg.defaultHeartbeatMs) : '-'}</span></div>`;
+    }
+
+    document.getElementById('config-body').innerHTML = col3;
+
+    // ═══ Active Processes table ═══
     const allProcs = allProcsForLive;
     if (allProcs.length === 0) {
       document.getElementById('procs-table').innerHTML = '<div class="empty">no active processes</div>';
@@ -625,7 +688,7 @@ async function refresh() {
         ${rows}</table>`;
     }
 
-    // Events
+    // ═══ Events ═══
     if (eventsData.events && eventsData.events.length > 0) {
       const container = document.getElementById('events-body');
       for (const ev of eventsData.events) {
@@ -653,7 +716,7 @@ async function refresh() {
 }
 
 // ── SSE Live Stream ──
-const activeStreams = new Map(); // reqId -> { el, bodyEl, text }
+const activeStreams = new Map();
 let sseConnected = false;
 
 function initSSE() {
@@ -669,11 +732,9 @@ function initSSE() {
     const d = JSON.parse(e.data);
     if (d.mode !== 'stream') return;
     const feeds = document.getElementById('stream-feeds');
-    // Remove placeholder
     const placeholder = feeds.querySelector('.empty');
     if (placeholder) placeholder.remove();
 
-    // Create stream item
     const item = document.createElement('div');
     item.className = 'stream-item';
     item.id = 'stream-' + d.reqId;
@@ -685,10 +746,7 @@ function initSSE() {
       </div>
       <div class="stream-item-body" id="sbody-${d.reqId}"><span class="cursor"></span></div>`;
     feeds.prepend(item);
-
     activeStreams.set(d.reqId, { el: item, text: '' });
-
-    // Keep max 5 stream items
     while (feeds.children.length > 5) feeds.removeChild(feeds.lastChild);
   });
 
@@ -696,11 +754,9 @@ function initSSE() {
     const d = JSON.parse(e.data);
     const stream = activeStreams.get(d.reqId);
     if (!stream) return;
-
     stream.text += d.text;
     const body = document.getElementById('sbody-' + d.reqId);
     if (body) {
-      // Show last 500 chars + cursor
       const display = stream.text.length > 500 ? '\u2026' + stream.text.slice(-500) : stream.text;
       body.innerHTML = display.replace(/</g, '&lt;') + '<span class="cursor"></span>';
       body.scrollTop = body.scrollHeight;
@@ -713,8 +769,6 @@ function initSSE() {
     const d = JSON.parse(e.data);
     const stream = activeStreams.get(d.reqId);
     if (!stream) return;
-
-    // Remove cursor, add completion indicator
     const body = document.getElementById('sbody-' + d.reqId);
     if (body) {
       const cursor = body.querySelector('.cursor');
@@ -724,20 +778,16 @@ function initSSE() {
     if (tokEl) {
       tokEl.innerHTML = `<span style="color:var(--green)">\u2713</span> ${fmtTok(d.inputTokens)} in \u2192 ${fmtTok(d.outputTokens)} out`;
     }
-
-    // Fade out after 30s
     setTimeout(() => {
       const el = document.getElementById('stream-' + d.reqId);
       if (el) { el.style.opacity = '0.4'; }
     }, 30000);
-
     activeStreams.delete(d.reqId);
   });
 
   es.onerror = () => {
     sseConnected = false;
     dot.classList.remove('connected');
-    // EventSource auto-reconnects
   };
 }
 
@@ -748,7 +798,7 @@ initSSE();
 refresh();
 fetchHistory();
 setInterval(refresh, 2000);
-setInterval(fetchHistory, 10000); // refresh charts every 10s
+setInterval(fetchHistory, 10000);
 </script>
 </body>
 </html>
