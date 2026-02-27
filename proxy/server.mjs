@@ -1511,6 +1511,15 @@ async function handleCompletions(req, res) {
         try { proc.kill("SIGTERM"); } catch { /* ignore */ }
       }, STREAM_TIMEOUT_MS);
 
+      // SSE keepalive: send comment lines to prevent upstream (Gateway) HTTP timeout.
+      // SSE spec allows `:comment\n\n` — client parsers ignore it but the TCP stays alive.
+      const SSE_KEEPALIVE_MS = 30_000; // every 30s
+      const keepaliveInterval = setInterval(() => {
+        if (!res.writableEnded) {
+          try { res.write(":keepalive\n\n"); } catch { /* ignore write errors */ }
+        }
+      }, SSE_KEEPALIVE_MS);
+
       proc.stdout.on("data", (data) => {
         resetHeartbeat();
         buffer += data.toString();
@@ -1582,6 +1591,7 @@ async function handleCompletions(req, res) {
       proc.on("close", (code) => {
         clearTimeout(heartbeatTimer);
         clearTimeout(execTimer);
+        clearInterval(keepaliveInterval);
 
         // Quick-fail auto-retry: if worker failed fast with no content, try another
         const elapsed = Date.now() - proc._spawnedAt;
@@ -1656,6 +1666,7 @@ async function handleCompletions(req, res) {
       proc.on("error", (err) => {
         clearTimeout(heartbeatTimer);
         clearTimeout(execTimer);
+        clearInterval(keepaliveInterval);
         // Quick-fail auto-retry on spawn error too
         if (!sentContent && retryCount < MAX_RETRIES) {
           const untried = _workerPool.find(
