@@ -341,9 +341,15 @@ function workerEnv(worker) {
   for (const key of WORKER_ENV_WHITELIST) {
     if (process.env[key] !== undefined) env[key] = process.env[key];
   }
-  // Ensure /opt/homebrew/bin is in PATH for the CLI's #!/usr/bin/env node shebang
+  // Ensure /opt/homebrew/bin + wrapper scripts dir are in PATH
   const path = env.PATH || "/usr/bin:/bin";
-  env.PATH = path.includes("/opt/homebrew/bin") ? path : `/opt/homebrew/bin:${path}`;
+  const homeDir = process.env.HOME || "/Users/duke_nukem_opcdbase";
+  const extraPaths = [`${homeDir}/.openclaw/bin`, "/opt/homebrew/bin"];
+  let finalPath = path;
+  for (const p of extraPaths) {
+    if (!finalPath.includes(p)) finalPath = `${p}:${finalPath}`;
+  }
+  env.PATH = finalPath;
   // Per-worker OAuth token (overrides any inherited value)
   if (worker.token) {
     env.CLAUDE_CODE_OAUTH_TOKEN = worker.token;
