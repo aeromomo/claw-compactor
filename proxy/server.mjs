@@ -348,12 +348,18 @@ function workerEnv(worker) {
   if (worker.token) {
     env.CLAUDE_CODE_OAUTH_TOKEN = worker.token;
   }
-  // Headless / non-interactive mode
+  // Headless / non-interactive mode — prevent ALL macOS interactive prompts
   env.CI = "true";                          // suppress macOS permission popups
   env.TERM_PROGRAM = "dumb";               // skip terminal-specific osascript detection
   env.TERM = "dumb";                       // reinforce non-interactive terminal
   env.NO_COLOR = "1";                      // no ANSI escape codes
   env.ELECTRON_NO_ATTACH_CONSOLE = "1";    // suppress Electron console
+  env.ELECTRON_RUN_AS_NODE = "1";          // skip Electron UI/keychain integration
+  env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"; // skip telemetry/updates
+  env.CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY = "1";      // skip interactive surveys
+  // Prevent macOS Keychain access prompts: if safeStorage is attempted,
+  // the OS prompts because node isn't in the Keychain ACL.
+  // Setting ELECTRON_RUN_AS_NODE bypasses Electron's safeStorage layer.
   return env;
 }
 const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT || "10", 10);
@@ -1472,6 +1478,10 @@ async function handleCompletions(req, res) {
     if (res.socket) {
       res.socket.setNoDelay(true);      // disable Nagle — send chunks immediately
     }
+    // Immediate keepalive: prevents Gateway from timing out while CLI spawns.
+    // Without this, there's a 4-10s gap between headers and first CLI output,
+    // causing ~49% of requests to be disconnected by Gateway.
+    res.write(":proxy-accepted\n\n");
 
     // Stream with auto-retry: if a worker fails quickly (<5s, no content),
     // automatically retry on a different worker before giving up.
@@ -1509,8 +1519,17 @@ async function handleCompletions(req, res) {
       let sentContent = false;
       let reqTokens = { input: 0, output: 0 };
       let outputChars = 0;
+      const spawnedAt = Date.now();
 
       proc.stderr.on("data", (d) => { stderrBuf += d.toString(); });
+
+      // First-byte warning: if CLI hasn't produced stdout within 8s, log a warning.
+      // This helps diagnose macOS auth dialogs, slow spawns, or keychain prompts.
+      const FIRST_BYTE_WARN_MS = 8_000;
+      const firstByteTimer = setTimeout(() => {
+        console.log(`[${ts()}] SLOW_SPAWN pid=${proc.pid} reqId=${reqId} model=${model} router=${worker.name} elapsed=${FIRST_BYTE_WARN_MS}ms — no stdout yet (possible macOS dialog or slow startup)`);
+        eventLog.push("timeout", { kind: "slow_spawn", pid: proc.pid, reqId, model, source, elapsed: FIRST_BYTE_WARN_MS });
+      }, FIRST_BYTE_WARN_MS);
 
       const heartbeatMs = HEARTBEAT_BY_MODEL[model] || DEFAULT_HEARTBEAT_MS;
       let heartbeatTimer = setTimeout(() => {
@@ -1536,15 +1555,31 @@ async function handleCompletions(req, res) {
 
       // SSE keepalive: send comment lines to prevent upstream (Gateway) HTTP timeout.
       // SSE spec allows `:comment\n\n` — client parsers ignore it but the TCP stays alive.
-      const SSE_KEEPALIVE_MS = 30_000; // every 30s
-      const keepaliveInterval = setInterval(() => {
+      // Phase 1: fast keepalive (5s) during CLI startup; Phase 2: slow (30s) after first content.
+      const FAST_KEEPALIVE_MS = 5_000;
+      const SLOW_KEEPALIVE_MS = 30_000;
+      let keepaliveMs = FAST_KEEPALIVE_MS;
+      let keepaliveInterval = setInterval(() => {
         if (!res.writableEnded) {
           try { res.write(":keepalive\n\n"); } catch { /* ignore write errors */ }
         }
-      }, SSE_KEEPALIVE_MS);
+      }, keepaliveMs);
+      function slowDownKeepalive() {
+        if (keepaliveMs === FAST_KEEPALIVE_MS) {
+          keepaliveMs = SLOW_KEEPALIVE_MS;
+          clearInterval(keepaliveInterval);
+          keepaliveInterval = setInterval(() => {
+            if (!res.writableEnded) {
+              try { res.write(":keepalive\n\n"); } catch { /* ignore */ }
+            }
+          }, SLOW_KEEPALIVE_MS);
+        }
+      }
 
       proc.stdout.on("data", (data) => {
+        clearTimeout(firstByteTimer); // CLI is alive — cancel slow-spawn warning
         resetHeartbeat();
+        slowDownKeepalive(); // CLI is producing output, switch to slow keepalive
         buffer += data.toString();
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
@@ -1612,6 +1647,7 @@ async function handleCompletions(req, res) {
       });
 
       proc.on("close", (code) => {
+        clearTimeout(firstByteTimer);
         clearTimeout(heartbeatTimer);
         clearTimeout(execTimer);
         clearInterval(keepaliveInterval);
@@ -1688,6 +1724,7 @@ async function handleCompletions(req, res) {
       });
 
       proc.on("error", (err) => {
+        clearTimeout(firstByteTimer);
         clearTimeout(heartbeatTimer);
         clearTimeout(execTimer);
         clearInterval(keepaliveInterval);
