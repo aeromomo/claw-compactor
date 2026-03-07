@@ -8,16 +8,9 @@ import logging
 from difflib import SequenceMatcher
 from typing import List, Tuple, Dict, Optional
 
-logger = logging.getLogger(__name__)
+from lib.unicode_maps import ZH_PUNCT_MAP as _ZH_PUNCT_MAP, normalize_zh_punctuation as _normalize_zh
 
-# Chinese punctuation -> English equivalents (saves tokens)
-_ZH_PUNCT_MAP: Dict[str, str] = {
-    '\uFF0C': ',', '\u3002': '.', '\uFF1B': ';', '\uFF1A': ':', '\uFF01': '!', '\uFF1F': '?',
-    '\u201C': '"', '\u201D': '"', '\u2018': "'", '\u2019': "'",
-    '\uFF08': '(', '\uFF09': ')', '\u3010': '[', '\u3011': ']',
-    '\u3001': ',', '\u2026': '...', '\u2014\u2014': '--', '\uFF5E': '~',
-}
-_ZH_PUNCT_RE = re.compile('|'.join(re.escape(k) for k in _ZH_PUNCT_MAP))
+logger = logging.getLogger(__name__)
 
 # Emoji pattern (broad: emoticons, symbols, pictographs, etc.)
 _EMOJI_RE = re.compile(
@@ -107,12 +100,12 @@ def remove_duplicate_lines(text: str) -> str:
 
 
 def normalize_chinese_punctuation(text: str) -> str:
-    """Replace Chinese fullwidth punctuation with ASCII equivalents."""
-    if not text:
-        return ""
-    # Handle the double-char em-dash first
-    text = text.replace('\u2014\u2014', '--')
-    return _ZH_PUNCT_RE.sub(lambda m: _ZH_PUNCT_MAP.get(m.group(), m.group()), text)
+    """Replace Chinese fullwidth punctuation with ASCII equivalents.
+
+    Delegates to :func:`lib.unicode_maps.normalize_zh_punctuation` which
+    is the canonical single source of truth for the character map.
+    """
+    return _normalize_zh(text)
 
 
 def strip_emoji(text: str) -> str:

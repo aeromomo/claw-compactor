@@ -16,14 +16,8 @@ from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Chinese full-width punctuation → half-width (each saves ~1 token)
-_ZH_PUNCT_MAP = {
-    '，': ',', '。': '.', '；': ';', '：': ':', '！': '!', '？': '?',
-    '"': '"', '"': '"', ''': "'", ''': "'",
-    '（': '(', '）': ')', '【': '[', '】': ']',
-    '、': ',', '…': '...', '——': '--', '～': '~',
-}
-_ZH_PUNCT_RE = re.compile('|'.join(re.escape(k) for k in _ZH_PUNCT_MAP))
+# Chinese full-width punctuation → half-width (canonical map from unicode_maps)
+from lib.unicode_maps import ZH_PUNCT_MAP as _ZH_PUNCT_MAP, normalize_zh_punctuation as _normalize_zh  # noqa: E402
 
 # Bold/italic markdown decorators
 _BOLD_RE = re.compile(r'\*\*(.+?)\*\*')
@@ -53,11 +47,12 @@ def strip_bold_italic(text: str) -> str:
 
 
 def normalize_punctuation(text: str) -> str:
-    """Replace Chinese fullwidth punctuation with ASCII equivalents."""
-    if not text:
-        return ""
-    text = text.replace('——', '--')
-    return _ZH_PUNCT_RE.sub(lambda m: _ZH_PUNCT_MAP.get(m.group(), m.group()), text)
+    """Replace Chinese fullwidth punctuation with ASCII equivalents.
+
+    Delegates to :func:`lib.unicode_maps.normalize_zh_punctuation` which
+    is the canonical single source of truth for the character map.
+    """
+    return _normalize_zh(text)
 
 
 def strip_trivial_backticks(text: str) -> str:
