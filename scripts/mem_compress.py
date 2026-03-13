@@ -182,7 +182,8 @@ def cmd_observe(workspace: Path, args) -> int:
     if not sessions_dirs:
         print(f"No session directories found under {sessions_base}/*/sessions/", file=sys.stderr)
         return 1
-    sessions_dir = sessions_dirs[0]  # primary agent
+    # Process all agents, not just the first (fixes multi-agent setups where
+    # sorted order may put a low-traffic agent like 'anvil' before 'main')
 
     # Load tracker
     mem_dir = workspace / "memory"
@@ -195,8 +196,10 @@ def cmd_observe(workspace: Path, args) -> int:
         except (json.JSONDecodeError, OSError):
             tracker = {}
 
-    # Find session files
-    session_files = sorted(Path(sessions_dir).glob("*.jsonl"))
+    # Find session files across all agent dirs
+    session_files = sorted(
+        sf for d in sessions_dirs for sf in Path(d).glob("*.jsonl")
+    )
     since = getattr(args, 'since', None)
 
     new_count = 0

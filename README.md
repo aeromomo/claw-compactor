@@ -319,8 +319,17 @@ All fields optional — sensible defaults are used when absent.
 | `memory/.codebook.json` | Dictionary codebook (must travel with memory files) |
 | `memory/.observed-sessions.json` | Tracks processed transcripts |
 | `memory/observations/` | Compressed session summaries |
-| `memory/MEMORY-L0.md` | Level 0 summary (~200 tokens) |
+| `memory/MEMORY-L0.md` | Level 0 summary (~200 tokens) — **see note below** |
+| `memory/MEMORY-L1.md` | Level 1 summary (~1000 tokens) — **see note below** |
 | `memory/.compactor-state.json` | Auto-compress tracking state |
+
+### ⚠️ L0/L1 Warning: Hand-curate, don't auto-generate
+
+The `tiers` command generates L0/L1/L2 files by scoring section headers with keyword matching. This works well for structured memory files (e.g. `MEMORY.md`) but produces **low-signal output when run against `memory/observations/`** — it fills the token budget with short, generic `[config] exec operation` sections instead of meaningful summaries.
+
+**Recommendation:** Write `MEMORY-L0.md` and `MEMORY-L1.md` manually. Use `tiers` for analysis (`--json` flag) to understand your token distribution, but treat the generated files as drafts that need review before use as boot context.
+
+Running `tiers` again will silently overwrite hand-curated files. If you've written your own L0/L1, either exclude them from the `tiers` output directory or don't run `tiers --output-dir` against your memory directory.
 
 ---
 
